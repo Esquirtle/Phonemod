@@ -1,0 +1,30 @@
+Group #CallHistoryEntry {
+  Padding: (Full: 6);
+  LayoutMode: Left;
+  Background: #b0bec5;
+
+  Group #CallInfo {
+    FlexWeight: 1;
+    LayoutMode: Top;
+    Padding: (Horizontal: 6);
+
+    Label #ContactName {
+      Text: "Name (555-0000)";
+      Style: (FontSize: 12, Alignment: Start);
+    }
+    Label #CallStatus {
+      Text: "Outgoing";
+      Style: (FontSize: 10, Alignment: Start);
+
+    }
+  }
+
+  TextButton #CallBackButton {
+    Anchor: (Width: 54, Height: 44);
+    Text: "Call";
+    Style: (
+      Default: (Background: #43D69A, LabelStyle: (FontSize: 12, Alignment: Center)),
+      Hovered: (Background: #2eb87d, LabelStyle: (FontSize: 14, Alignment: Center))
+    );
+  }
+}

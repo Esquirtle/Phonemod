@@ -1,0 +1,11 @@
+{
+  "HitBox": {
+    "Min": {
+      "X": -1,
+      "Y": -1,
+      "Z": -1
+    }
+  },
+  "Model": "Items/Playground/Phone.blockymodel",
+  "Texture": "Items/Playground/Phone.png"
+}

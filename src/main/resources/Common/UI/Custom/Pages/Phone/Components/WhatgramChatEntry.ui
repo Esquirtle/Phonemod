@@ -1,0 +1,30 @@
+Group #WhatgramChatEntry {
+  Padding: (Full: 8);
+  LayoutMode: Left;
+  Background: #9db48d;
+  Group #Cheat{
+    TextButton #Button {
+      Anchor: (Width: 310, Height: 55);
+      Style: (
+        Default: (Background: #b3b3b3),
+        Hovered: (Background: #808080)
+      );
+    }
+    Group #Contact{
+      LayoutMode: Left;
+      Padding: (Horizontal: 5);
+      Group #Avatar {
+        Anchor: (Width: 40, Height: 40);
+        Padding: (Horizontal: 5);
+        Background: #7a7a7a;
+      }
+      Label #Name {
+        Padding: (Horizontal: 5);
+        Text: "Name";
+        Style: (Alignment: Center);
+      }
+    }
+
+  }
+
+}

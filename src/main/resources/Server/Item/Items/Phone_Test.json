@@ -1,0 +1,22 @@
+{
+  "Icon": "Icons/ItemsGenerated/Phone_Test.png",
+  "Model": "Items/Playground/Phone.blockymodel",
+  "Texture": "Items/Playground/phone.png",
+  "MaxStack": 1,
+  "PlayerAnimationsId": "Phone",
+  "Quality": "Tool",
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "open_phone"
+        }
+      ]
+    }
+  },
+  "TranslationProperties": {
+    "Name": "Phone",
+    "Description": "HyPhone MAX"
+  },
+  "ItemLevel": 1
+}

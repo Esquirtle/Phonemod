@@ -1,0 +1,21 @@
+@MainApp = Group {
+  LayoutMode: Top;
+  FlexWeight: 1;
+  Anchor: (Width: 360, Height:600);
+  ItemGrid #RewardItemGrid {
+    SlotsPerRow: 2;
+    Style: (
+      SlotSize: 64,
+      SlotIconSize: 64 -3,
+      SlotSpacing: 5,
+      SlotBackground: "../Common/BlockSelectorSlotBackground.png"
+    );            
+  }
+
+};
+
+@AppTopbar = Group {
+  LayoutMode: CenterMiddle;
+  Anchor: (Width: 360, Height:30);
+  Background: #7a7a7a;
+};

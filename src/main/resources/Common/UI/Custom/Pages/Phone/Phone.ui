@@ -1,0 +1,58 @@
+$Common = "../../Common.ui";
+$APPMENU = "MainApp.ui";
+// Full-screen dimmed overlay — centers the phone window
+Group #PhoneOverlay {
+  Background: PatchStyle(Color: #000000(0.5));
+  LayoutMode: CenterMiddle;
+
+  Group #Phone {
+    Anchor: (Width: 390, Height: 620, Left: 520);
+    Background: PatchStyle(Color: #1a1a1a(0.95), Border: 1);
+    LayoutMode: Top;
+
+    // ── Content area — inject app panels here via sendUpdate ──────────────────
+    Group #Content {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Padding: (Full: 12);
+
+      Group #Phone{
+        Anchor: (Width: 360, Height:600);
+        LayoutMode: Top;
+        Group #TopBar {
+          Anchor: (Height: 30);
+          Background: #333333;
+          Padding: (Horizontal: 12, Vertical: 8);
+          Label {
+            Anchor: (Left: 1);
+            Text: "HyTel";
+          }
+          Group #HytelLogo{
+
+            Background: "../Phone/hytel_logo.png";
+            Anchor: (Width: 20, Height: 20, Left: 50);
+          }
+          Group #BatteryIcon{
+            Background: "../Phone/battery_icon.png";
+            Anchor: (Width: 20, Height: 20, Right: 1);
+          }
+
+
+        }
+        Group #AppContent {
+          Anchor: (Width: 360, Height: 520);
+          Background: #b43030;
+          LayoutMode: Top;
+
+        }
+        Group #BottomBar{
+          Anchor: (Height: 55);
+          $Common.@TertiaryTextButton #HomeButton {
+            @Text = "O";
+            Anchor: (Width: 44, Height: 44);
+          }
+        }
+      }
+    }
+  }
+}
