@@ -1,0 +1,11 @@
+{
+  "Group": "esq.phonemod",
+  "Name": "Phonemod",
+  "Version": "1.0.0",
+  "Description": "Phonemod .\nPowered by Playground-Core",
+  "Authors": [{"Name": "esquirtle"}],
+  "Main": "esq.phonemod.PhoneMod",
+  "LoadOrder": "POSTWORLD",
+  "ServerVersion": "0.5.0-pre.9",
+  "IncludesAssetPack": true
+}

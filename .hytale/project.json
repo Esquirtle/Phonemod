@@ -1,0 +1,10 @@
+{
+  "groupId": "esq.unstable",
+  "artifactId": "playground",
+  "modName": "playground",
+  "version": "1.0.0",
+  "buildSystem": "Maven",
+  "language": "Java",
+  "jarPath": "target/playground-1.0.0.jar",
+  "buildTask": "package"
+}

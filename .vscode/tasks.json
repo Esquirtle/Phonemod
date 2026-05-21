@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build plugin",
+			"type": "shell",
+			"command": "mvn package -q",
+			"group": "build"
+		}
+	]
+}
