@@ -6,15 +6,18 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.protocol.packets.interface_.Page;
+import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
 import esq.phonemod.phone.components.PhoneOwnerComponent;
@@ -37,6 +40,8 @@ import javax.annotation.Nonnull;
  */
 public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEventData> {
 
+    private static final int RINGTONE_NONKIA = SoundEvent.getAssetMap().getIndex("Ringtone_Nonkia");
+    private static final int MESSAGE_SENT_SOUND = SoundEvent.getAssetMap().getIndex("Notification_Message_Sent");
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final String PHONE_UI = "Pages/Phone/Phone.ui";
     private static final String APPMENU_UI = "Pages/Phone/AppMenu.ui";
@@ -136,6 +141,9 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
             // Deliver to recipient (handles their persist + toast + live push).
             PhoneRegistry.deliver(currentChatContact,
                     new TextMessage(phoneNumber, phoneNumber, trimmedBody));
+            if (MESSAGE_SENT_SOUND != 0) {
+                SoundUtil.playSoundEvent2d(ref, MESSAGE_SENT_SOUND, SoundCategory.UI, store);
+            }
             // Re-render chat to show the sent message.
             UICommandBuilder cmd = new UICommandBuilder();
             UIEventBuilder evb = new UIEventBuilder();
@@ -245,6 +253,9 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
 
     /** Called by {@link CallRegistry} when an incoming call arrives. */
     public void onIncomingCall(@Nonnull String callerNumber, @Nonnull String callerName) {
+        if (cachedRef != null && cachedStore != null && RINGTONE_NONKIA != 0) {
+            SoundUtil.playSoundEvent2d(cachedRef, RINGTONE_NONKIA, SoundCategory.UI, cachedStore);
+        }
         currentState = PhoneStatesEnum.INCOMING_CALL;
         UICommandBuilder cmd = new UICommandBuilder();
         UIEventBuilder evb = new UIEventBuilder();

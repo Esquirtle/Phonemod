@@ -2,7 +2,7 @@
   "Layers": [
     {
       "Files": [
-        "Sounds/PlayerActions/Playground/nokia.ogg"
+        "Sounds/PlayerActions/Playground/message-received.ogg"
       ],
       "RandomSettings": {
         "MinPitch": -0.5,
@@ -14,5 +14,7 @@
     }
   ],
   "Volume": 0,
-  "PreventSoundInterruption": true
+  "PreventSoundInterruption": true,
+  "MaxDistance": 4,
+  "StartAttenuationDistance": 2
 }

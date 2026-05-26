@@ -3,8 +3,11 @@ package esq.phonemod.phone.messaging;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.NotificationUtil;
@@ -31,6 +34,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class PhoneRegistry {
 
+    private static final int MESSAGE_RECEIVED_SOUND = SoundEvent.getAssetMap()
+            .getIndex("Notification_Message_Received");
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     /** phone number → session entry for players whose phone is currently open. */
@@ -106,6 +111,13 @@ public final class PhoneRegistry {
                             Message.raw(message.fromName()).color("#43D69A"),
                             Message.raw(message.body())
                     );
+                    if (MESSAGE_RECEIVED_SOUND != 0) {
+                        SoundUtil.playSoundEvent2d(
+                                re.ref(),
+                                MESSAGE_RECEIVED_SOUND,
+                                SoundCategory.UI,
+                                re.store());
+                    }
                 } catch (Exception e) {
                     LOGGER.atWarning().withCause(e).log("[PhoneRegistry] Failed to notify %s", toNumber);
                 }
