@@ -8,7 +8,7 @@
 
 ## Architecture summary
 - Entry point: [server/src/main/java/esq/phonemod/PhoneMod.java](server/src/main/java/esq/phonemod/PhoneMod.java) — registers managers and bootstraps setup.
-- Core managers: `SetupManager` coordinates startup; `AssetRegistryManager`, `CommandRegistryManager`, `ComponentRegistryManager`, and `InteractionSetupManager` register assets, commands, components and interactions respectively (see [server/src/main/java/esq/phonemod/setup](server/src/main/java/esq/phonemod/setup)).
+- Core managers: `SetupManager` coordinates startup; `AssetRegistryManager`, `ComponentRegistryManager`, `EventRegistryManager`, `CommandRegistryManager`, and `InteractionSetupManager` register plugin assets, component codecs, event hooks, commands, and item interactions respectively (see [server/src/main/java/esq/phonemod/setup](server/src/main/java/esq/phonemod/setup)).
 - Packages of interest:
   - `phone/components` — component definitions and persistent data hooks.
   - `phone/interactions` — item interactions and behavior registration.
@@ -48,13 +48,14 @@ phonemod/
   - `PhoneMod` → `SetupManager` → individual registry managers (assets, commands, components, interactions). Registrations link JSON assets, UI pages and handlers so the phone becomes available at runtime.
 
 ## Main managers / extension points
-- `SetupManager` ([server/src/main/java/esq/phonemod/setup/SetupManager.java](server/src/main/java/esq/phonemod/setup/SetupManager.java)) — central bootstrapping.
-- `AssetRegistryManager` — register item assets and UI pages.
-- `ComponentRegistryManager` — register persistent components and codecs.
-- `InteractionSetupManager` — register item interactions (open UI, button handlers).
-- `CommandRegistryManager` — in-game commands used for testing or debug.
+- `SetupManager` ([server/src/main/java/esq/phonemod/setup/SetupManager.java](server/src/main/java/esq/phonemod/setup/SetupManager.java)) — orchestrates plugin startup and invokes the other registry managers.
+- `AssetRegistryManager` — reserved for registering custom asset stores and game assets. In this plugin it currently contains placeholder registration logic, so it is the location to add future item/UI asset store bindings.
+- `ComponentRegistryManager` — registers phone-related persistent components and their BuilderCodecs (`PhoneOwnerComponent`, `ConversationHistoryComponent`, `CallHistoryComponent`). This is the correct extension point for new player data storage.
+- `EventRegistryManager` — registers global event hooks and packet filters, such as disconnect cleanup and voice packet interception.
+- `InteractionSetupManager` — registers item interactions like `open_phone` used by the handheld phone item.
+- `CommandRegistryManager` — registers plugin commands like `PhoneCommand` for debug/test usage.
 
-These are the primary places to hook extensions: add registrations here so systems are discovered at startup.
+These are the primary extension points: add registration calls here so the plugin discovers your new behavior during startup.
 
 ## Networking & synchronization
 - Use `phone/messaging` to add new message types and handlers. Keep messages small and idempotent; validate all client-sent data server-side.
