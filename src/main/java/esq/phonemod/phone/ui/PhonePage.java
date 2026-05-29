@@ -19,6 +19,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import esq.phonemod.device.api.DevicePageHandle;
 import esq.phonemod.phone.api.PhoneApp;
 import esq.phonemod.phone.api.PhoneAppContext;
 import esq.phonemod.phone.api.PhoneEvent;
@@ -40,7 +41,8 @@ import javax.annotation.Nonnull;
  * super,
  * or by injecting content into {@code #Content} via {@code sendUpdate()}.
  */
-public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEventData> {
+public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEventData>
+        implements DevicePageHandle {
 
     private static final int RINGTONE_NONKIA = SoundEvent.getAssetMap().getIndex("Ringtone_Nonkia");
     private static final int MESSAGE_SENT_SOUND = SoundEvent.getAssetMap().getIndex("Notification_Message_Sent");

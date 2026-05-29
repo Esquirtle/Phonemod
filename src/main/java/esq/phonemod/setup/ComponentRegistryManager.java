@@ -3,6 +3,7 @@ package esq.phonemod.setup;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.PhoneMod;
+import esq.phonemod.device.components.DeviceSettingsComponent;
 import esq.phonemod.phone.components.CallHistoryComponent;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
 import esq.phonemod.phone.components.PhoneAppSessionState;
@@ -16,6 +17,13 @@ public class ComponentRegistryManager {
     }
 
     public void register() {
+        ComponentType<EntityStore, DeviceSettingsComponent> deviceSettingsType =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        DeviceSettingsComponent.class,
+                        "DeviceSettings",
+                        DeviceSettingsComponent.CODEC);
+        DeviceSettingsComponent.setComponentType(deviceSettingsType);
+
         ComponentType<EntityStore, PhoneOwnerComponent> phoneOwnerType =
                 plugin.getEntityStoreRegistry().registerComponent(
                         PhoneOwnerComponent.class,

@@ -1,6 +1,7 @@
 package esq.phonemod.setup;
 
 import esq.phonemod.PhoneMod;
+import esq.phonemod.device.core.DeviceService;
 import esq.phonemod.phone.apps.CallsApp;
 import esq.phonemod.phone.apps.ContactsApp;
 import esq.phonemod.phone.apps.SettingsApp;
@@ -16,6 +17,7 @@ public class SetupManager {
 
 
     public SetupManager(PhoneMod plugin) {
+        DeviceService.initialize();
         PhoneService.initialize();
         this.assetRegistryManager = new AssetRegistryManager(plugin);
         this.componentRegistryManager = new ComponentRegistryManager(plugin);

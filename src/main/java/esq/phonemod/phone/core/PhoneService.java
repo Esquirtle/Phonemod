@@ -1,6 +1,7 @@
 package esq.phonemod.phone.core;
 
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import esq.phonemod.device.core.DeviceService;
 import esq.phonemod.phone.api.PhoneApp;
 import esq.phonemod.phone.ui.PhonePage;
 
@@ -20,6 +21,7 @@ public final class PhoneService {
     }
 
     public static void initialize() {
+        DeviceService.initialize();
         if (instance == null) {
             instance = new PhoneService();
         }

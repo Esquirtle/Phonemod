@@ -11,8 +11,8 @@ import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.NotificationUtil;
+import esq.phonemod.device.api.DevicePageHandle;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
-import esq.phonemod.phone.ui.PhonePage;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -57,7 +57,7 @@ public final class PhoneRegistry {
                                 @Nonnull PlayerRef playerRef,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull World world,
-                                @Nonnull PhonePage page) {
+                                @Nonnull DevicePageHandle page) {
         online.put(phoneNumber, new OnlineEntry(ref, playerRef, store, world, page));
         LOGGER.atInfo().log("[PhoneRegistry] Registered phone %s", phoneNumber);
     }
@@ -197,6 +197,6 @@ public final class PhoneRegistry {
             @Nonnull PlayerRef playerRef,
             @Nonnull Store<EntityStore> store,
             @Nonnull World world,
-            @Nonnull PhonePage page
+            @Nonnull DevicePageHandle page
     ) {}
 }
