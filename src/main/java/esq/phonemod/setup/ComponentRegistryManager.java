@@ -5,6 +5,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.PhoneMod;
 import esq.phonemod.phone.components.CallHistoryComponent;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
+import esq.phonemod.phone.components.PhoneAppSessionState;
 import esq.phonemod.phone.components.PhoneOwnerComponent;
 
 public class ComponentRegistryManager {
@@ -35,6 +36,13 @@ public class ComponentRegistryManager {
                         "PhoneCallHistory",
                         CallHistoryComponent.CODEC);
         CallHistoryComponent.setComponentType(callHistoryType);
+
+        ComponentType<EntityStore, PhoneAppSessionState> sessionStateType =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        PhoneAppSessionState.class,
+                        "PhoneAppSessionState",
+                        PhoneAppSessionState.CODEC);
+        PhoneAppSessionState.setComponentType(sessionStateType);
     }
 
     public void registerSystems() {

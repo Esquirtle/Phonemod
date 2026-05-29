@@ -1,7 +1,11 @@
 # Gradle
 .gradle/
 build/
-
+.docs/
+.github/
+.hytale
+.claude/
+.vscode/
 # Maven
 target/
 pom.xml.tag
@@ -15,3 +19,10 @@ pom.xml.versionsBackup
 
 # Hytale
 server/*
+
+# Claude - decompiled source reference (populate via update-server-lib)
+.claude/source/
+.vscode/settings.json
+REFRACTOR_PLAN.md
+PHONE_APP_FRAMEWORK.md
+CLAUDE.md

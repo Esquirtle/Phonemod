@@ -1,33 +1,48 @@
 package esq.phonemod.phone.ui;
 
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import esq.phonemod.phone.api.PhoneApp;
+import esq.phonemod.phone.core.PhoneService;
 
 import javax.annotation.Nonnull;
 
-public class AppMenu {
+public final class AppMenu {
 
-    // Selectors — target the TextButton inside each @AppButton instance
-    private static final String BTN_WHATGRAM  = "#WHATGRAM #APPBUTTON";
-    private static final String BTN_CONTACTS  = "#CONTACTS #APPBUTTON";
-    private static final String BTN_GANG      = "#GANG #APPBUTTON";
-    private static final String BTN_SETTINGS  = "#SETTINGS #APPBUTTON";
-    private static final String BTN_AMASON    = "#AMASON #APPBUTTON";
-    private static final String BTN_CALLS     = "#CALLS #APPBUTTON";
+    private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+    private static final String APP_HOLDER = "#APPHolder";
 
-    public static void buildEventBindings(@Nonnull UIEventBuilder evb) {
-        evb.addEventBinding(CustomUIEventBindingType.Activating, BTN_WHATGRAM,
-                EventData.of("Action", "open_app").append("App", "whatgram"), false);
-        evb.addEventBinding(CustomUIEventBindingType.Activating, BTN_CONTACTS,
-                EventData.of("Action", "open_app").append("App", "contacts"), false);
-        evb.addEventBinding(CustomUIEventBindingType.Activating, BTN_GANG,
-                EventData.of("Action", "open_app").append("App", "gang"), false);
-        evb.addEventBinding(CustomUIEventBindingType.Activating, BTN_SETTINGS,
-                EventData.of("Action", "open_app").append("App", "settings"), false);
-        evb.addEventBinding(CustomUIEventBindingType.Activating, BTN_AMASON,
-                EventData.of("Action", "open_app").append("App", "amason"), false);
-        evb.addEventBinding(CustomUIEventBindingType.Activating, BTN_CALLS,
-                EventData.of("Action", "open_app").append("App", "calls"), false);
+    private AppMenu() {}
+
+    public static void build(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
+        cmd.clear(APP_HOLDER);
+
+        int i = 0;
+        for (PhoneApp<?> app : PhoneService.get().getApps()) {
+            String buttonUI = app.getAppButtonUI();
+            LOGGER.atInfo().log("[AppMenu] app=%s buttonUI=%s", app.getId(), buttonUI);
+
+            if (buttonUI == null || buttonUI.isBlank()) {
+                LOGGER.atWarning().log("[AppMenu] app=%s has no getAppButtonUI() — skipped", app.getId());
+                continue;
+            }
+            // Each app owns a .ui file with its icon hardcoded in the TextButton style —
+            // the only reliable way to set TextButton backgrounds since style properties
+            // are immutable after parse time.
+            cmd.append(APP_HOLDER, buttonUI);
+
+            String entrySelector = APP_HOLDER + "[" + i + "]";
+            // Label text IS dynamically settable (it's a Text property, not a style).
+            cmd.set(entrySelector + " #APPNAME.Text", app.getDisplayName());
+
+            evb.addEventBinding(CustomUIEventBindingType.Activating,
+                    entrySelector + " #APPBUTTON",
+                    EventData.of("Action", "open_app").append("App", app.getId()),
+                    false);
+            i++;
+        }
     }
 }

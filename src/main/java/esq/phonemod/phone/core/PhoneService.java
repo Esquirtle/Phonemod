@@ -1,0 +1,54 @@
+package esq.phonemod.phone.core;
+
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import esq.phonemod.phone.api.PhoneApp;
+import esq.phonemod.phone.ui.PhonePage;
+
+import javax.annotation.Nonnull;
+import java.util.List;
+
+/**
+ * Core phone platform service. Manages registered apps and creates phone pages.
+ */
+public final class PhoneService {
+
+    private static PhoneService instance;
+    private final PhoneAppRegistry appRegistry;
+
+    private PhoneService() {
+        this.appRegistry = new PhoneAppRegistry();
+    }
+
+    public static void initialize() {
+        if (instance == null) {
+            instance = new PhoneService();
+        }
+    }
+
+    @Nonnull
+    public static PhoneService get() {
+        if (instance == null) {
+            throw new IllegalStateException("PhoneService must be initialized before use");
+        }
+        return instance;
+    }
+
+    public void registerApp(@Nonnull PhoneApp<?> app) {
+        this.appRegistry.register(app);
+    }
+
+    public PhoneApp<?> getApp(@Nonnull String appId) {
+        return this.appRegistry.get(appId);
+    }
+
+    @Nonnull
+    public List<PhoneApp<?>> getApps() {
+        return this.appRegistry.getApps();
+    }
+
+    @Nonnull
+    public PhonePage createPhonePage(@Nonnull PlayerRef playerRef,
+                                    @Nonnull String phoneNumber) {
+        return new PhonePage(playerRef, phoneNumber);
+    }
+}

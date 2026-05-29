@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.phone.components.PhoneOwnerComponent;
+import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.PhoneRegistry;
 import esq.phonemod.phone.ui.PhonePage;
 import org.bson.BsonDocument;
@@ -92,7 +93,7 @@ public final class OpenPhone extends SimpleInstantInteraction {
         // The PhonePage is created here so its reference can be stored in the registry
         // for live push updates before the page is opened on the world thread.
         var store = commandBuffer.getStore();
-        PhonePage phonePage = new PhonePage(playerRef, phoneNumber);
+        PhonePage phonePage = PhoneService.get().createPhonePage(playerRef, phoneNumber);
         World world = player.getWorld();
         PhoneRegistry.register(phoneNumber, ref, playerRef, store, world, phonePage);
 
@@ -109,9 +110,14 @@ public final class OpenPhone extends SimpleInstantInteraction {
         });
     }
 
-    /** Generates a number in the format {@code 555-XXXX}. */
+    /** Generates a number in the format {@code XXX-XXXX}. */
     private static String generatePhoneNumber() {
-        int suffix = 1000 + RANDOM.nextInt(9000);
-        return "555-" + suffix;
+        String phoneNumber;
+        do {
+            int prefix = 100 + RANDOM.nextInt(900);
+            int suffix = RANDOM.nextInt(10_000);
+            phoneNumber = String.format("%03d-%04d", prefix, suffix);
+        } while (PhoneRegistry.getOnlineEntry(phoneNumber) != null);
+        return phoneNumber;
     }
 }

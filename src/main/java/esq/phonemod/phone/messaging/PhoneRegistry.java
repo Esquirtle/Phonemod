@@ -41,9 +41,6 @@ public final class PhoneRegistry {
     /** phone number → session entry for players whose phone is currently open. */
     private static final ConcurrentHashMap<String, OnlineEntry> online = new ConcurrentHashMap<>();
 
-    /** player UUID → phone number reverse lookup (used by voice filter in CallRegistry). */
-    private static final ConcurrentHashMap<java.util.UUID, String> uuidToPhone = new ConcurrentHashMap<>();
-
     /** phone number → received messages this session (for inbox conversation list). */
     private static final ConcurrentHashMap<String, List<TextMessage>> inboxes = new ConcurrentHashMap<>();
 
@@ -62,7 +59,6 @@ public final class PhoneRegistry {
                                 @Nonnull World world,
                                 @Nonnull PhonePage page) {
         online.put(phoneNumber, new OnlineEntry(ref, playerRef, store, world, page));
-        uuidToPhone.put(playerRef.getUuid(), phoneNumber);
         LOGGER.atInfo().log("[PhoneRegistry] Registered phone %s", phoneNumber);
     }
 
@@ -73,7 +69,6 @@ public final class PhoneRegistry {
     public static void unregisterByRef(@Nonnull Ref<EntityStore> ref) {
         online.entrySet().removeIf(entry -> {
             if (entry.getValue().ref().equals(ref)) {
-                uuidToPhone.remove(entry.getValue().playerRef().getUuid());
                 LOGGER.atInfo().log("[PhoneRegistry] Unregistered phone %s (disconnect)", entry.getKey());
                 return true;
             }
@@ -93,12 +88,10 @@ public final class PhoneRegistry {
      * </ol>
      */
     public static void deliver(@Nonnull String toNumber, @Nonnull TextMessage message) {
+        LOGGER.atInfo().log("[PhoneRegistry] deliver to=%s from=%s body=%s", toNumber, message.fromNumber(), message.body());
         inboxes.computeIfAbsent(toNumber, k -> Collections.synchronizedList(new ArrayList<>()))
                .add(message);
 
-        // Snapshot entries — ConcurrentHashMap reads are safe from any thread.
-        // All Store access and UI push must run on the WorldThread, so we dispatch
-        // them via world.execute() for each party.
         OnlineEntry recipientEntry = online.get(toNumber);
         if (recipientEntry != null) {
             final ChatMessage receivedMsg = new ChatMessage(false, message.fromName(), message.body());
@@ -121,8 +114,11 @@ public final class PhoneRegistry {
                 } catch (Exception e) {
                     LOGGER.atWarning().withCause(e).log("[PhoneRegistry] Failed to notify %s", toNumber);
                 }
+                LOGGER.atInfo().log("[PhoneRegistry] push incoming message to page for %s from=%s", toNumber, message.fromNumber());
                 re.page().onIncomingMessage(message.fromNumber());
             });
+        } else {
+            LOGGER.atInfo().log("[PhoneRegistry] recipient %s is offline or not registered", toNumber);
         }
     }
 
@@ -164,10 +160,34 @@ public final class PhoneRegistry {
         return Collections.unmodifiableCollection(online.values());
     }
 
-    /** Returns the phone number associated with the given player UUID, or {@code null} if not registered. */
-    @Nullable
-    public static String getPhoneNumberByUuid(@Nonnull java.util.UUID uuid) {
-        return uuidToPhone.get(uuid);
+    /**
+     * Returns all phone numbers currently registered to the given player UUID.
+     * A player can have multiple phones open simultaneously, one per physical phone item.
+     */
+    @Nonnull
+    public static List<String> getPhoneNumbersByUuid(@Nonnull java.util.UUID uuid) {
+        List<String> result = new ArrayList<>();
+        for (java.util.Map.Entry<String, OnlineEntry> entry : online.entrySet()) {
+            if (entry.getValue().playerRef().getUuid().equals(uuid)) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns all phone numbers currently registered to the given entity ref.
+     * Used during disconnect cleanup to find all sessions for a departing player.
+     */
+    @Nonnull
+    public static List<String> getPhoneNumbersByRef(@Nonnull Ref<EntityStore> ref) {
+        List<String> result = new ArrayList<>();
+        for (java.util.Map.Entry<String, OnlineEntry> entry : online.entrySet()) {
+            if (entry.getValue().ref().equals(ref)) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
     }
 
     // ── Types ─────────────────────────────────────────────────────────────────

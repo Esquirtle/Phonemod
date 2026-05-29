@@ -67,7 +67,14 @@ public final class CallRegistry {
     public static final PlayerPacketFilter VOICE_FILTER = (playerRef, packet) -> {
         if (!(packet instanceof VoiceData voiceData)) return false;
 
-        String callerNumber = PhoneRegistry.getPhoneNumberByUuid(playerRef.getUuid());
+        // Find which of this player's phone numbers is in an active call
+        String callerNumber = null;
+        for (String number : PhoneRegistry.getPhoneNumbersByUuid(playerRef.getUuid())) {
+            if (activeCalls.containsKey(number)) {
+                callerNumber = number;
+                break;
+            }
+        }
         if (callerNumber == null) return false;
 
         String partnerNumber = activeCalls.get(callerNumber);

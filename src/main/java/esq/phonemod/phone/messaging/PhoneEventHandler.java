@@ -32,9 +32,8 @@ public final class PhoneEventHandler implements Consumer<PlayerDisconnectEvent> 
             return;
         }
 
-        // Clean up any active/pending call before unregistering
-        String phoneNumber = PhoneRegistry.getPhoneNumberByUuid(playerRef.getUuid());
-        if (phoneNumber != null) {
+        // Clean up any active/pending calls for all phones owned by this player before unregistering
+        for (String phoneNumber : PhoneRegistry.getPhoneNumbersByRef(ref)) {
             CallRegistry.cleanupOnDisconnect(phoneNumber);
         }
         PhoneRegistry.unregisterByRef(ref);

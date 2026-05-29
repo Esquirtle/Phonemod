@@ -19,12 +19,14 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import esq.phonemod.phone.components.ConversationHistoryComponent;
-import esq.phonemod.phone.components.PhoneOwnerComponent;
+import esq.phonemod.phone.api.PhoneApp;
+import esq.phonemod.phone.api.PhoneAppContext;
+import esq.phonemod.phone.api.PhoneEvent;
+import esq.phonemod.phone.apps.helpers.Calls;
+import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.CallRegistry;
-import esq.phonemod.phone.messaging.ChatMessage;
-import esq.phonemod.phone.messaging.PhoneRegistry;
-import esq.phonemod.phone.messaging.TextMessage;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.annotation.Nonnull;
 
@@ -47,7 +49,8 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
     private static final String APPMENU_UI = "Pages/Phone/AppMenu.ui";
     private static final String PHONEBOXSELECTOR = "#AppContent";
     private PhoneStatesEnum currentState = PhoneStatesEnum.HOME;
-    private String currentChatContact = null;
+    private PhoneApp<?> currentApp = null;
+    private String currentAppId = null;
     private final String phoneNumber;
     // Cached from build()/handleDataEvent() for use in onIncomingMessage()
     private Ref<EntityStore> cachedRef = null;
@@ -102,6 +105,7 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
             @Nonnull PhoneEventData data) {
         this.cachedRef = ref;
         this.cachedStore = store;
+        LOGGER.atInfo().log("[PhonePage] handleDataEvent phone=%s app=%s action=%s state=%s", phoneNumber, data.app, data.action, currentAppId);
         if ("home".equals(data.action)) {
             currentState = PhoneStatesEnum.HOME;
             UICommandBuilder cmd = new UICommandBuilder();
@@ -112,119 +116,67 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
         }
 
         if ("open_app".equals(data.action)) {
-            openApp(ref, store, data.app);
-            return;
-        }
-
-        if ("open_chat".equals(data.action) && data.contact != null) {
-            currentState = PhoneStatesEnum.CHAT;
-            currentChatContact = data.contact;
             UICommandBuilder cmd = new UICommandBuilder();
             UIEventBuilder evb = new UIEventBuilder();
-            Whatgram.loadChat(phoneNumber, data.contact, store, ref, cmd, evb);
-            sendUpdate(cmd, evb, false);
-            return;
-        }
-
-        if ("send_message".equals(data.action) && currentChatContact != null) {
-            String body = data.messageValue;
-            if (body == null || body.isBlank()) {
+            PhoneApp<?> app = openApp(ref, store, data.app, cmd, evb);
+            if (app == null) {
                 sendUpdate(null, false);
                 return;
             }
-            String trimmedBody = body.trim();
-            // Persist the sent message directly — we are already on the world thread.
-            ConversationHistoryComponent history = store.ensureAndGetComponent(
-                    ref, ConversationHistoryComponent.getComponentType());
-            history.addMessage(phoneNumber, currentChatContact, new ChatMessage(true, phoneNumber, trimmedBody));
-            store.putComponent(ref, ConversationHistoryComponent.getComponentType(), history);
-            // Deliver to recipient (handles their persist + toast + live push).
-            PhoneRegistry.deliver(currentChatContact,
-                    new TextMessage(phoneNumber, phoneNumber, trimmedBody));
-            if (MESSAGE_SENT_SOUND != 0) {
-                SoundUtil.playSoundEvent2d(ref, MESSAGE_SENT_SOUND, SoundCategory.UI, store);
-            }
-            // Re-render chat to show the sent message.
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            Whatgram.loadChat(phoneNumber, currentChatContact, store, ref, cmd, evb);
             sendUpdate(cmd, evb, false);
             return;
         }
 
-        if ("open_add_contact".equals(data.action)) {
-            currentState = PhoneStatesEnum.CONTACT_ADD;
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            Contacts.loadAddContactState(cmd, evb);
-            sendUpdate(cmd, evb, false);
-            return;
-        }
-
-        if ("contacts".equals(data.action)) {
-            currentState = PhoneStatesEnum.CONTACTS;
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            Contacts.loadContactsState(phoneNumber, store, ref, cmd, evb);
-            sendUpdate(cmd, evb, false);
-            return;
-        }
-
-        if ("save_contact".equals(data.action)) {
-            String number = data.contactFormNumber;
-            String name   = data.contactFormName;
-            if (number != null && !number.isBlank() && name != null && !name.isBlank()) {
-                PhoneOwnerComponent owner =
-                        store.ensureAndGetComponent(ref, PhoneOwnerComponent.getComponentType());
-                owner.addContact(phoneNumber, number.trim(), name.trim());
-                store.putComponent(ref, PhoneOwnerComponent.getComponentType(), owner);
-            }
-            currentState = PhoneStatesEnum.CONTACTS;
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            Contacts.loadContactsState(phoneNumber, store, ref, cmd, evb);
-            sendUpdate(cmd, evb, false);
-            return;
-        }
-
-        if ("remove_contact".equals(data.action) && data.contact != null) {
-            PhoneOwnerComponent owner =
-                    store.ensureAndGetComponent(ref, PhoneOwnerComponent.getComponentType());
-            owner.removeContact(phoneNumber, data.contact);
-            store.putComponent(ref, PhoneOwnerComponent.getComponentType(), owner);
-            currentState = PhoneStatesEnum.CONTACTS;
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            Contacts.loadContactsState(phoneNumber, store, ref, cmd, evb);
-            sendUpdate(cmd, evb, false);
-            return;
-        }
-
-        if ("start_call".equals(data.action)) {
-            String target = data.contact != null ? data.contact : data.dialNumber;
-            if (target != null && !target.isBlank()) {
-                String trimmed = target.trim();
-                CallRegistry.initiateCall(phoneNumber, trimmed, trimmed);
-                // Immediately show calling screen so player can't fire start_call again
-                currentState = PhoneStatesEnum.ACTIVE_CALL;
+        if ("open_chat".equals(data.action) && !"whatgram".equals(currentAppId)) {
+            if (data.contact != null && !data.contact.isBlank()) {
                 UICommandBuilder cmd = new UICommandBuilder();
                 UIEventBuilder evb = new UIEventBuilder();
-                Calls.loadActiveCallState(trimmed, "Calling...", cmd, evb);
+                PhoneApp<?> app = openApp(ref, store, "whatgram", cmd, evb);
+                if (app == null) {
+                    sendUpdate(null, false);
+                    return;
+                }
+                PhoneAppContext ctx = createContext(ref, store, "whatgram");
+                if (ctx != null) {
+                    PhoneEvent event = toPhoneEvent(data);
+                    UICommandBuilder innerCmd = new UICommandBuilder();
+                    UIEventBuilder innerEvb = new UIEventBuilder();
+                    if (app.handleEvent(ctx, event, innerCmd, innerEvb)) {
+                        sendUpdate(innerCmd, innerEvb, false);
+                        return;
+                    }
+                }
                 sendUpdate(cmd, evb, false);
-            } else {
-                sendUpdate(null, false);
+                return;
             }
+            sendUpdate(null, false);
             return;
         }
 
         if ("answer_call".equals(data.action)) {
             CallRegistry.answerCall(phoneNumber);
+            sendUpdate(null, false);
             return;
         }
 
         if ("decline_call".equals(data.action) || "hang_up".equals(data.action)) {
             CallRegistry.hangUp(phoneNumber);
+            sendUpdate(null, false);
             return;
+        }
+
+        PhoneApp<?> app = currentApp;
+        if (app != null) {
+            PhoneAppContext ctx = createContext(ref, store, currentAppId);
+            if (ctx != null) {
+                PhoneEvent event = toPhoneEvent(data);
+                UICommandBuilder cmd = new UICommandBuilder();
+                UIEventBuilder evb = new UIEventBuilder();
+                if (app.handleEvent(ctx, event, cmd, evb)) {
+                    sendUpdate(cmd, evb, false);
+                    return;
+                }
+            }
         }
 
         LOGGER.atInfo().log("[PhonePage] Unhandled action: %s", data.action);
@@ -242,7 +194,7 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
         currentState = PhoneStatesEnum.HOME;
         cmd.clear(PHONEBOXSELECTOR);
         cmd.append(PHONEBOXSELECTOR, APPMENU_UI);
-        AppMenu.buildEventBindings(evb);
+        AppMenu.build(cmd, evb);
     }
 
 
@@ -253,8 +205,21 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
 
     /** Called by {@link CallRegistry} when an incoming call arrives. */
     public void onIncomingCall(@Nonnull String callerNumber, @Nonnull String callerName) {
-        if (cachedRef != null && cachedStore != null && RINGTONE_NONKIA != 0) {
-            SoundUtil.playSoundEvent2d(cachedRef, RINGTONE_NONKIA, SoundCategory.UI, cachedStore);
+        if (cachedRef != null && cachedStore != null) {
+            if (RINGTONE_NONKIA != 0) {
+                SoundUtil.playSoundEvent2d(cachedRef, RINGTONE_NONKIA, SoundCategory.UI, cachedStore);
+            }
+            if (currentApp != null && currentAppId != null) {
+                PhoneAppContext ctx = createContext(cachedRef, cachedStore, currentAppId);
+                if (ctx != null) {
+                    currentApp.onIncomingCall(ctx, callerNumber, callerName);
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    UIEventBuilder evb = new UIEventBuilder();
+                    currentApp.build(ctx, cmd, evb);
+                    sendUpdate(cmd, evb, false);
+                    return;
+                }
+            }
         }
         currentState = PhoneStatesEnum.INCOMING_CALL;
         UICommandBuilder cmd = new UICommandBuilder();
@@ -265,6 +230,17 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
 
     /** Called by {@link CallRegistry} when the call is connected. */
     public void onCallAnswered(@Nonnull String partnerNumber, @Nonnull String partnerName) {
+        if (cachedRef != null && cachedStore != null && currentApp != null && currentAppId != null) {
+            PhoneAppContext ctx = createContext(cachedRef, cachedStore, currentAppId);
+            if (ctx != null) {
+                currentApp.onClose(ctx);
+                UICommandBuilder cmd = new UICommandBuilder();
+                UIEventBuilder evb = new UIEventBuilder();
+                currentApp.build(ctx, cmd, evb);
+                sendUpdate(cmd, evb, false);
+                return;
+            }
+        }
         currentState = PhoneStatesEnum.ACTIVE_CALL;
         UICommandBuilder cmd = new UICommandBuilder();
         UIEventBuilder evb = new UIEventBuilder();
@@ -274,6 +250,17 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
 
     /** Called by {@link CallRegistry} when the call ends (either side hangs up). */
     public void onCallEnded() {
+        if (cachedRef != null && cachedStore != null && currentApp != null && currentAppId != null) {
+            PhoneAppContext ctx = createContext(cachedRef, cachedStore, currentAppId);
+            if (ctx != null) {
+                currentApp.onClose(ctx);
+                UICommandBuilder cmd = new UICommandBuilder();
+                UIEventBuilder evb = new UIEventBuilder();
+                currentApp.build(ctx, cmd, evb);
+                sendUpdate(cmd, evb, false);
+                return;
+            }
+        }
         UICommandBuilder cmd = new UICommandBuilder();
         UIEventBuilder evb = new UIEventBuilder();
         if (cachedRef != null && cachedStore != null) {
@@ -286,19 +273,27 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
     }
 
     /**
-     * Called by {@link PhoneRegistry#deliver} when a message arrives for this player.
+     * Called by {@link esq.phonemod.phone.messaging.PhoneRegistry#deliver} when a message arrives for this player.
      * If the player is currently viewing the conversation with {@code fromNumber},
      * re-renders the chat immediately without requiring the player to reopen it.
      */
     public void onIncomingMessage(@Nonnull String fromNumber) {
-        if (currentState == PhoneStatesEnum.CHAT
-                && fromNumber.equals(currentChatContact)
-                && cachedRef != null
-                && cachedStore != null) {
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            Whatgram.loadChat(phoneNumber, currentChatContact, cachedStore, cachedRef, cmd, evb);
-            sendUpdate(cmd, evb, false);
+        LOGGER.atInfo().log("[PhonePage] onIncomingMessage phone=%s currentApp=%s from=%s", phoneNumber, currentAppId, fromNumber);
+        if (currentApp != null && currentAppId != null && cachedRef != null && cachedStore != null) {
+            PhoneAppContext ctx = createContext(cachedRef, cachedStore, currentAppId);
+            if (ctx != null) {
+                UICommandBuilder cmd = new UICommandBuilder();
+                UIEventBuilder evb = new UIEventBuilder();
+                if (currentApp.onIncomingMessage(ctx, fromNumber, cmd, evb)) {
+                    LOGGER.atInfo().log("[PhonePage] dynamic incoming message handled for %s", currentAppId);
+                    sendUpdate(cmd, evb, false);
+                    return;
+                }
+                LOGGER.atInfo().log("[PhonePage] falling back to rebuild on incoming message for %s", currentAppId);
+                currentApp.onIncomingMessage(ctx, fromNumber);
+                currentApp.build(ctx, cmd, evb);
+                sendUpdate(cmd, evb, false);
+            }
         }
     }
 
@@ -311,42 +306,68 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
         }
     }
 
-    private void openApp(@Nonnull Ref<EntityStore> ref,
-            @Nonnull Store<EntityStore> store,
-            @Nonnull String app) {
-        UICommandBuilder cmd = new UICommandBuilder();
-        UIEventBuilder evb = new UIEventBuilder();
-        switch (app) {
-            case "whatgram" -> {
-                currentState = PhoneStatesEnum.MESSAGES;
-                Whatgram.loadConversationList(phoneNumber, store, ref, cmd, evb);
-            }
-            case "contacts" -> {
-                currentState = PhoneStatesEnum.CONTACTS;
-                Contacts.loadContactsState(phoneNumber, store, ref, cmd, evb);
-            }
-            case "gang" -> {
-                currentState = PhoneStatesEnum.GANG;
-                /* TODO */ }
-            case "settings" -> {
-                currentState = PhoneStatesEnum.SETTINGS;
-                Settings.loadSettingsState(phoneNumber, cmd, evb);
-            }
-            case "calls" -> {
-                currentState = PhoneStatesEnum.CALLS;
-                Calls.loadCallsState(phoneNumber, store, ref, cmd, evb);
-            }
-            case "amason" -> {
-                currentState = PhoneStatesEnum.MARKET;
-                /* TODO */ }
-            default -> {
-                LOGGER.atWarning().log("[PhonePage] Unknown app: %s", app);
-                sendUpdate(null, false);
-                return;
-            }
+    private PhoneAppContext createContext(@Nonnull Ref<EntityStore> ref,
+                                          @Nonnull Store<EntityStore> store,
+                                          @Nonnull String appId) {
+        var playerRef = store.getComponent(ref, PlayerRef.getComponentType());
+        if (playerRef == null) {
+            LOGGER.atWarning().log("[PhonePage] PlayerRef missing for phone context");
+            return null;
         }
-        LOGGER.atInfo().log("[PhonePage] Opening app '%s', state -> %s", app, currentState);
-        sendUpdate(cmd, evb, false);
+        return new PhoneAppContext(ref, store, playerRef, phoneNumber, appId);
+    }
+
+    private PhoneEvent toPhoneEvent(@Nonnull PhoneEventData data) {
+        Map<String, String> params = new HashMap<>();
+        if (data.contact != null) {
+            params.put("Contact", data.contact);
+        }
+        if (data.messageValue != null) {
+            params.put("MessageValue", data.messageValue);
+        }
+        if (data.contactFormNumber != null) {
+            params.put("ContactFormNumber", data.contactFormNumber);
+        }
+        if (data.contactFormName != null) {
+            params.put("ContactFormName", data.contactFormName);
+        }
+        if (data.dialNumber != null) {
+            params.put("DialNumber", data.dialNumber);
+        }
+        params.put("State", String.valueOf(data.STATE));
+        return new PhoneEvent(data.action == null ? "" : data.action,
+                data.app == null ? "" : data.app,
+                params);
+    }
+
+    private PhoneApp<?> openApp(@Nonnull Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull String appId,
+            @Nonnull UICommandBuilder cmd,
+            @Nonnull UIEventBuilder evb) {
+        PhoneApp<?> app = PhoneService.get().getApp(appId);
+        if (app == null) {
+            LOGGER.atWarning().log("[PhonePage] Unknown app: %s", appId);
+            return null;
+        }
+
+        PhoneAppContext ctx = createContext(ref, store, appId);
+        if (ctx == null) {
+            return null;
+        }
+
+        if (currentApp != null) {
+            currentApp.onClose(ctx);
+        }
+
+        this.currentApp = app;
+        this.currentAppId = appId;
+        this.currentState = PhoneStatesEnum.APP;
+        cmd.clear(PHONEBOXSELECTOR);
+        app.onOpen(ctx, cmd, evb);
+        app.build(ctx, cmd, evb);
+        LOGGER.atInfo().log("[PhonePage] Opening app '%s', state -> %s", appId, currentState);
+        return app;
     }
 
     // ── Event data codec ──────────────────────────────────────────────────────
