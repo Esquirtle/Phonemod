@@ -1,107 +1,180 @@
-# PhoneMod (Hytale) — Developer README
+# PhoneMod — Hytale Plugin
 
->A concise guide for developers who want to understand and extend the PhoneMod smartphone plugin.
-
-## Project overview
-- Purpose: adds an in-game smartphone item with apps, UI pages, interactions and messaging for Hytale servers.
-- Main gameplay/features: a handheld phone item, app system (multiple apps/screens), in-game notifications, send/receive messaging and UI-driven interactions.
-
-## Architecture summary
-- Entry point: [server/src/main/java/esq/phonemod/PhoneMod.java](server/src/main/java/esq/phonemod/PhoneMod.java) — registers managers and bootstraps setup.
-- Core managers: `SetupManager` coordinates startup; `AssetRegistryManager`, `ComponentRegistryManager`, `EventRegistryManager`, `CommandRegistryManager`, and `InteractionSetupManager` register plugin assets, component codecs, event hooks, commands, and item interactions respectively (see [server/src/main/java/esq/phonemod/setup](server/src/main/java/esq/phonemod/setup)).
-- Packages of interest:
-  - `phone/components` — component definitions and persistent data hooks.
-  - `phone/interactions` — item interactions and behavior registration.
-  - `phone/messaging` — networking/packet-like messaging and message handling.
-  - `phone/ui` — UI controller classes and client UI bindings.
-
-## Project structure (important folders)
-
-```
-phonemod/
-├─ server/src/main/java/esq/phonemod/
-│  ├─ PhoneMod.java
-│  ├─ setup/                 # registration managers
-│  └─ phone/
-│     ├─ components/         # persistent components
-│     ├─ interactions/       # item/app interactions
-│     ├─ messaging/          # in-plugin messages / packets
-│     └─ ui/                 # UI controllers
-└─ server/src/main/resources/
-   ├─ Common/UI/Custom/Pages  # .ui pages for phone screens
-   └─ Server/Item/Items       # Phone item JSON
-```
-
-## How it works — quick technical summary
-
-- Smartphone lifecycle
-  - The phone is defined as an Item asset (resources JSON). When equipped/used, interaction handlers (in `phone/interactions`) open the UI and create or bind `phone` components for the player.
-- App system
-  - Apps are driven by `PhonePage` state. The home screen menu is defined in `src/main/resources/Common/UI/Custom/Pages/Phone/AppMenu.ui`; app buttons send `open_app` actions to `PhonePage`, which then loads the selected app state and UI fragment.
-- Client/server communication
-  - The plugin uses a messaging layer (`phone/messaging`) to serialize and route UI requests, notifications and app actions between client and server. Treat these classes as packet definitions and handlers.
-- UI handling
-  - UI pages (.ui files) live in resources and are opened via server-side helpers. UI controllers receive events and call into managers or components for state changes.
-- Save data
-  - Player-related state is stored in components under `phone/components` and persisted using the server's component/codec patterns; use the `ComponentRegistryManager` for registration and serialization.
-- Initialization flow
-  - `PhoneMod` → `SetupManager` → individual registry managers (assets, commands, components, interactions). Registrations link JSON assets, UI pages and handlers so the phone becomes available at runtime.
-
-## Main managers / extension points
-- `SetupManager` ([server/src/main/java/esq/phonemod/setup/SetupManager.java](server/src/main/java/esq/phonemod/setup/SetupManager.java)) — orchestrates plugin startup and invokes the other registry managers.
-- `AssetRegistryManager` — reserved for registering custom asset stores and game assets. In this plugin it currently contains placeholder registration logic, so it is the location to add future item/UI asset store bindings.
-- `ComponentRegistryManager` — registers phone-related persistent components and their BuilderCodecs (`PhoneOwnerComponent`, `ConversationHistoryComponent`, `CallHistoryComponent`). This is the correct extension point for new player data storage.
-- `EventRegistryManager` — registers global event hooks and packet filters, such as disconnect cleanup and voice packet interception.
-- `InteractionSetupManager` — registers item interactions like `open_phone` used by the handheld phone item.
-- `CommandRegistryManager` — registers plugin commands like `PhoneCommand` for debug/test usage.
-
-These are the primary extension points: add registration calls here so the plugin discovers your new behavior during startup.
-
-## Networking & synchronization
-- Use `phone/messaging` to add new message types and handlers. Keep messages small and idempotent; validate all client-sent data server-side.
-- Follow existing message handler patterns to route incoming messages to the relevant `phone/ui` controller or component update.
-
-## How to expand the plugin (practical recipes)
-
-- Add a new smartphone app
-  1. Add an app icon/button to `src/main/resources/Common/UI/Custom/Pages/Phone/AppMenu.ui`.
-  2. Add an event binding in `src/main/java/esq/phonemod/phone/ui/AppMenu.java` for the new button. Use `Action=open_app` and a unique `App` identifier.
-  3. Update `src/main/java/esq/phonemod/phone/ui/PhonePage.java` in `openApp(...)` to handle the new app identifier and render your app state.
-  4. Create any required UI fragments under `src/main/resources/Common/UI/Custom/Pages/Phone/` and load them from `PhonePage` using `UICommandBuilder`/`UIEventBuilder`.
-  
-  Note: this plugin routes app launches through the `PhonePage` state machine, not through a separate interaction. The phone home screen (`AppMenu`) dispatches app IDs to `PhonePage.openApp`.
-
-- Add UI screens
-  - Write .ui markup, localize strings in `src/main/resources/Server/Languages/en-US/playground.lang`, and then inject or append the screen content from `PhonePage` using the existing UI builder APIs.
-
-- Add packets / network logic
-  - Implement new message classes and handlers under `phone/messaging`. If the UI sends new actions, extend `PhonePage.PhoneEventData` and update `PhonePage.handleDataEvent(...)` to interpret them. Register any server-side handlers as needed.
-
-- Add persistent player data
-  - Define a component in `phone/components` with a BuilderCodec for serialization. Register it with `ComponentRegistryManager`. Read and write it inside `PhonePage` event handlers or interaction code so player state persists automatically.
-
-- Extend gameplay safely
-  - Use `CommandBuffer` or the server stores/APIs for entity changes. Keep new state within `PhonePage` and components; avoid global mutable state. If you need periodic updates or cross-entity behavior, register a dedicated system rather than stuffing logic into `PhonePage`.
-
-## Event flow (typical request path)
-1. Player activates phone item → interaction handler (in `phone/interactions`).
-2. Interaction opens UI page (resources UI). Server binds UI to controller.
-3. Client UI events send messages via `phone/messaging` → server handler.
-4. Server handler updates components or triggers actions (commands, notifications).
-5. Server optionally sends UI updates/notifications to client.
-
-## Recommended reference files
-- [server/src/main/java/esq/phonemod/PhoneMod.java](server/src/main/java/esq/phonemod/PhoneMod.java)
-- [server/src/main/java/esq/phonemod/setup/SetupManager.java](server/src/main/java/esq/phonemod/setup/SetupManager.java)
-- [server/src/main/java/esq/phonemod/setup/ComponentRegistryManager.java](server/src/main/java/esq/phonemod/setup/ComponentRegistryManager.java)
-- [server/src/main/java/esq/phonemod/phone/messaging](server/src/main/java/esq/phonemod/phone/messaging)
-- `server/src/main/resources/Common/UI/Custom/Pages` (UI files)
-- `server/src/main/resources/Server/Item/Items/Phone.json` (item definition)
-
-## Next steps
-- I added this README to the project root. If you want, I can:
-  - open or patch example controller/component scaffolding for a new app,
-  - or run a quick build (`mvn package -q`) to verify there are no resource/compilation mismatches.
+Adds an in-game smartphone to Hytale servers. Players equip a phone item and interact with it to open a full-screen UI with a home screen, built-in apps (Whatgram, Calls, Contacts, Settings), and a public API for third-party plugins to register their own apps.
 
 ---
-Short, practical, and focused on extension points — tell me which follow-up example you'd like (scaffold an app, add a UI, or add a persistent component).
+
+## Quick links
+
+- **Full API docs** → [`docs/`](docs/README.md)
+- **Build** → `mvn package -q` (output: `target/final/Phonemod.jar`)
+- **Deploy** → copy JAR to the server's `mods/` directory
+
+---
+
+## Project structure
+
+```
+src/main/java/esq/phonemod/
+├── PhoneMod.java                     — plugin entry point
+├── setup/
+│   ├── SetupManager.java             — orchestrates startup
+│   ├── ComponentRegistryManager.java — registers ECS components
+│   ├── EventRegistryManager.java     — registers disconnect handler, voice filter
+│   └── InteractionSetupManager.java  — registers open_phone item interaction
+└── phone/
+    ├── api/                          — public framework API (PhoneApp, StatefulPhoneApp,
+    │                                    PhoneAppContext, PhoneEvent, PhoneEventActions,
+    │                                    PhoneAssetPaths)
+    ├── apps/                         — built-in apps (WhatgramApp, CallsApp,
+    │                                    ContactsApp, SettingsApp)
+    ├── components/                   — ECS components (PhoneOwnerComponent,
+    │                                    PhoneAppSessionState, ConversationHistoryComponent,
+    │                                    CallHistoryComponent)
+    ├── core/                         — PhoneService singleton, PhoneAppRegistry
+    ├── interactions/                 — OpenPhone item interaction
+    ├── messaging/                    — PhoneRegistry (sessions), CallRegistry (calls),
+    │                                    PhoneEventHandler (disconnect cleanup)
+    └── ui/                           — PhonePage (routing hub), AppMenu, PhoneStatesEnum
+
+assets/phonemod.ui/                   — client-side asset pack (UI files, icons)
+docs/                                 — developer reference
+```
+
+---
+
+## Architecture
+
+### App framework
+
+Apps are singletons registered with `PhoneService`. One instance serves all players — per-player state lives exclusively in `PhoneAppContext`.
+
+```
+PhoneService
+  └─ PhoneAppRegistry
+       └─ List<PhoneApp<?>>          one instance per registered app
+
+PhonePage                            one instance per player per phone open
+  ├─ currentApp: PhoneApp<?>
+  └─ build() / handleDataEvent()
+       └─ PhoneAppContext            created per-call; backed by PhoneAppSessionState
+```
+
+### Session registry
+
+`PhoneRegistry` tracks active open phone sessions (`phoneNumber → OnlineEntry`). A single player can have multiple phones open simultaneously — each session is keyed by phone number, not player UUID. `CallRegistry` manages voice routing between call participants.
+
+### State isolation
+
+`PhoneAppSessionState` (ECS component) stores `Map<phoneNumber|appId, Map<key, value>>`. State is scoped per physical phone per app, so two phones owned by the same player never bleed state into each other.
+
+---
+
+## Adding a third-party app
+
+### 1. Implement `StatefulPhoneApp`
+
+```java
+public final class MyApp extends StatefulPhoneApp<MyApp.State> {
+
+    public enum State { LIST, DETAIL }
+
+    public MyApp() { super(State.LIST); }
+
+    @Override public String getId()           { return "myapp"; }
+    @Override public String getDisplayName()  { return "My App"; }
+    @Override public String getAppButtonUI()  { return "Pages/Playground/MyAppButton.ui"; }
+    @Override public String getUIPath()       { return "Pages/Phone/MyApp.ui"; }
+
+    @Override
+    public void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
+        appendMainUI(cmd);
+        // populate #AppContent based on getState(ctx)
+    }
+
+    @Override
+    public boolean handleEvent(PhoneAppContext ctx, PhoneEvent event,
+                               UICommandBuilder cmd, UIEventBuilder evb) {
+        // handle events, update state, call build(), return true
+        return false;
+    }
+}
+```
+
+### 2. Create the app button `.ui` file
+
+Place at the path returned by `getAppButtonUI()` in your plugin's asset pack. Image paths inside `.ui` files are resolved relative to the file's own location.
+
+```
+// Pages/Playground/MyAppButton.ui
+Group #APPBUTTONENTRY {
+  LayoutMode: Top; FlexWeight: 1;
+  Padding: (Horizontal: 3, Vertical: 3);
+  Anchor: (Width: 84, Height: 100);
+  TextButton #APPBUTTON {
+    Anchor: (Width: 64, Height: 64);
+    Style: (
+      Default: (Background: "../Phone/MyApp.png"),
+      Hovered:  (Background: #808080),
+      Pressed:  (Background: #7a7a7a)
+    );
+  }
+  Label #APPNAME {
+    Anchor: (Top: 8, Width: 84, Height: 16);
+    Text: "App";
+    Style: (FontSize: 12, Alignment: Center, RenderBold: true);
+  }
+}
+```
+
+### 3. Register in your plugin's setup
+
+```java
+// Call PhoneService.initialize() first — it is idempotent, so safe to call
+// even if phonemod's own setup() has not run yet (alphabetical load ordering).
+PhoneService.initialize();
+PhoneService.get().registerApp(new MyApp());
+```
+
+---
+
+## Key event actions
+
+| Constant | Value | Handled by |
+|----------|-------|------------|
+| `HOME` | `"home"` | PhonePage |
+| `OPEN_APP` | `"open_app"` | PhonePage |
+| `OPEN_CHAT` | `"open_chat"` | PhonePage |
+| `ANSWER_CALL` | `"answer_call"` | PhonePage |
+| `DECLINE_CALL` | `"decline_call"` | PhonePage |
+| `HANG_UP` | `"hang_up"` | PhonePage |
+| `BACK` | `"back"` | app |
+| `SEND_MESSAGE` | `"send_message"` | WhatgramApp |
+| `START_CALL` | `"start_call"` | CallsApp / WhatgramApp |
+
+See [`PhoneEventActions`](src/main/java/esq/phonemod/phone/api/PhoneEventActions.java) for the full list.
+
+---
+
+## Persistence
+
+| Component | Purpose |
+|-----------|---------|
+| `PhoneOwnerComponent` | Contact list, keyed by own phone number |
+| `ConversationHistoryComponent` | Full message history across sessions |
+| `CallHistoryComponent` | Call records (incoming/outgoing/missed) |
+| `PhoneAppSessionState` | Live session state for apps (resets on logout) |
+
+---
+
+## Reference
+
+| Topic | File |
+|-------|------|
+| Full API reference | [`docs/api-reference.md`](docs/api-reference.md) |
+| Creating an app (step-by-step) | [`docs/creating-apps.md`](docs/creating-apps.md) |
+| State management | [`docs/state-management.md`](docs/state-management.md) |
+| Events & EventData bindings | [`docs/events.md`](docs/events.md) |
+| Asset paths & icon conventions | [`docs/assets.md`](docs/assets.md) |
+| PhonePage routing internals | [`docs/phone-navigation.md`](docs/phone-navigation.md) |
+| Class roles & data flow | [`docs/architecture.md`](docs/architecture.md) |
