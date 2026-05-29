@@ -7,10 +7,12 @@ import javax.annotation.Nonnull;
 /**
  * Base class for apps that use an enum-based state machine.
  *
- * <p>State is stored per-player in {@link PhoneAppContext} — never on the app
+ * <p>
+ * State is stored per-player in {@link PhoneAppContext} — never on the app
  * instance — so a single app object can safely serve all players concurrently.
  *
- * <p>Read the current state with {@link #getState(PhoneAppContext)}, which
+ * <p>
+ * Read the current state with {@link #getState(PhoneAppContext)}, which
  * returns {@code initialState} when no state has been written yet. Write it
  * with {@link #setState(PhoneAppContext, Enum)}.
  *

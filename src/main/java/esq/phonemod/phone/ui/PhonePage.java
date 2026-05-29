@@ -46,7 +46,6 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
     private static final int MESSAGE_SENT_SOUND = SoundEvent.getAssetMap().getIndex("Notification_Message_Sent");
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
     private static final String PHONE_UI = "Pages/Phone/Phone.ui";
-    private static final String APPMENU_UI = "Pages/Phone/AppMenu.ui";
     private static final String PHONEBOXSELECTOR = "#AppContent";
     private PhoneStatesEnum currentState = PhoneStatesEnum.HOME;
     private PhoneApp<?> currentApp = null;
@@ -93,7 +92,9 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
             currentState = PhoneStatesEnum.INCOMING_CALL;
             Calls.loadIncomingCallState(pendingCaller, pendingCaller, cmd, evb);
         } else {
-            loadHomeState(cmd, evb);
+            // Initial open: Phone.ui already placed #APPHolder inside #AppContent —
+            // populate it directly without clearing #AppContent first.
+            AppMenu.build(cmd, evb);
         }
     }
 
@@ -192,8 +193,13 @@ public final class PhonePage extends InteractiveCustomUIPage<PhonePage.PhoneEven
      */
     private void loadHomeState(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
         currentState = PhoneStatesEnum.HOME;
+        currentApp = null;
+        currentAppId = null;
+        // #APPHolder was destroyed when an app loaded its UI into #AppContent.
+        // Clear the app content and restore the home grid container inline so
+        // AppMenu.build can populate it without needing AppMenu.ui.
         cmd.clear(PHONEBOXSELECTOR);
-        cmd.append(PHONEBOXSELECTOR, APPMENU_UI);
+        cmd.appendInline(PHONEBOXSELECTOR, "Group #APPHolder { LayoutMode: LeftCenterWrap; }");
         AppMenu.build(cmd, evb);
     }
 

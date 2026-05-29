@@ -1,13 +1,19 @@
 # PhoneMod — Hytale Plugin
 
 Adds an in-game smartphone to Hytale servers. Players equip a phone item and interact with it to open a full-screen UI with a home screen, built-in apps (Whatgram, Calls, Contacts, Settings), and a public API for third-party plugins to register their own apps.
+https://github.com/Esquirtle/Phonemod-Assets
+This assets are required to run the compiled plugin.
+
 
 ---
-
+## IF YOU CRASH WHEN TRY TO COMPILE THIS SOURCE CODE AND RUN THE PLUGIN WITHOUT THE PHONEMOD ASSETS ##
+  https://github.com/Esquirtle/Phonemod-Assets
+This assets are required to run the compiled plugin.
 ## Quick links
 
 - **Full API docs** → [`docs/`](docs/README.md)
 - **Build** → `mvn package -q` (output: `target/final/Phonemod.jar`)
+- **Build with bundled assets** → `mvn clean package -P bundle -q` (includes `Phonemod-Assets/Common` and `Phonemod-Assets/Server` into `resources/`)
 - **Deploy** → copy JAR to the server's `mods/` directory
 
 ---

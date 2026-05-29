@@ -17,12 +17,15 @@ public interface PhoneApp<S extends Enum<S>> {
     /**
      * Path to the .ui file that renders this app's button in the AppMenu grid.
      *
-     * <p>The file must define a root element named {@code #APPBUTTONENTRY} containing
-     * a {@code TextButton #APPBUTTON} (with the icon hardcoded in its Default style)
+     * <p>
+     * The file must define a root element named {@code #APPBUTTONENTRY} containing
+     * a {@code TextButton #APPBUTTON} (with the icon hardcoded in its Default
+     * style)
      * and a {@code Label #APPNAME}. AppMenu sets the label text dynamically after
      * appending the file, so {@code Text} in the file is just a placeholder.
      *
-     * <p>Example path: {@code "Pages/Phone/Components/WhatgramButton.ui"}.
+     * <p>
+     * Example path: {@code "Pages/Phone/Components/WhatgramButton.ui"}.
      * Third-party plugins should use their own namespace, e.g.
      * {@code "Pages/Playground/AppIcon.ui"}.
      */
@@ -35,32 +38,36 @@ public interface PhoneApp<S extends Enum<S>> {
     }
 
     default void onOpen(PhoneAppContext ctx,
-                          UICommandBuilder cmd,
-                          UIEventBuilder evb) {}
+            UICommandBuilder cmd,
+            UIEventBuilder evb) {
+    }
 
     void build(PhoneAppContext ctx,
-               UICommandBuilder cmd,
-               UIEventBuilder evb);
+            UICommandBuilder cmd,
+            UIEventBuilder evb);
 
     boolean handleEvent(PhoneAppContext ctx,
-                        PhoneEvent event,
-                        UICommandBuilder cmd,
-                        UIEventBuilder evb);
+            PhoneEvent event,
+            UICommandBuilder cmd,
+            UIEventBuilder evb);
 
-    default void onClose(PhoneAppContext ctx) {}
+    default void onClose(PhoneAppContext ctx) {
+    }
 
     default void onIncomingMessage(PhoneAppContext ctx,
-                                   String fromNumber) {}
+            String fromNumber) {
+    }
 
     default boolean onIncomingMessage(PhoneAppContext ctx,
-                                       String fromNumber,
-                                       UICommandBuilder cmd,
-                                       UIEventBuilder evb) {
+            String fromNumber,
+            UICommandBuilder cmd,
+            UIEventBuilder evb) {
         onIncomingMessage(ctx, fromNumber);
         return false;
     }
 
     default void onIncomingCall(PhoneAppContext ctx,
-                                String callerNumber,
-                                String callerName) {}
+            String callerNumber,
+            String callerName) {
+    }
 }

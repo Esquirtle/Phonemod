@@ -6,6 +6,6 @@
   "Authors": [{"Name": "esquirtle"}],
   "Main": "esq.phonemod.PhoneMod",
   "LoadOrder": "POSTWORLD",
-  "ServerVersion": "0.5.0",
+  "ServerVersion": ">=0.5.2 <0.6.0",
   "IncludesAssetPack": true
 }

@@ -43,6 +43,43 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>bundle</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>add-phone-asset-resources</id>
+                <phase>generate-resources</phase>
+                <goals>
+                  <goal>add-resource</goal>
+                </goals>
+                <configuration>
+                  <resources>
+                    <resource>
+                      <directory>${phonemod.assets.dir}/Common</directory>
+                      <targetPath>.</targetPath>
+                      <filtering>false</filtering>
+                    </resource>
+                    <resource>
+                      <directory>${phonemod.assets.dir}/Server</directory>
+                      <targetPath>.</targetPath>
+                      <filtering>false</filtering>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
   <dependencies>
     <dependency>
       <groupId>com.hytale</groupId>
@@ -54,8 +91,9 @@
   </dependencies>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <hytale.patchline>release</hytale.patchline>
+    <hytale.patchline>pre-release</hytale.patchline>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <hytale.install-dir>${user.home}/AppData/Roaming</hytale.install-dir>
+    <phonemod.assets.dir>C:\Users\ed\IdeaProjects\Phonemod-Assets</phonemod.assets.dir>
   </properties>
 </project>
