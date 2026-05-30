@@ -2,7 +2,7 @@
 
 ## PhoneEvent
 
-`PhoneEvent` is an immutable payload created by `PhonePage` from the raw `PhoneEventData` codec object. It is passed to `PhoneApp.handleEvent()`.
+`PhoneEvent` is an immutable payload created by `DevicePage` from the raw `PhoneEventData` codec object. It is passed to `PhoneApp.handleEvent()`.
 
 ```java
 event.getAction()               // the action string (e.g. "open_chat")
@@ -14,9 +14,9 @@ event.getParam("key", "default") // @Nonnull — safe overload
 
 ## Phone-level vs app-level actions
 
-`PhonePage.handleDataEvent()` intercepts phone-level actions before they reach any app. App-level actions are forwarded to `currentApp.handleEvent()`.
+`DevicePage.handleDataEvent()` intercepts phone-level actions before they reach any app. App-level actions are forwarded to `currentApp.handleEvent()`.
 
-### Phone-level actions (intercepted by PhonePage)
+### Phone-level actions (intercepted by DevicePage)
 
 These are never passed to `handleEvent`. Do not handle them in your app.
 
@@ -29,7 +29,7 @@ These are never passed to `handleEvent`. Do not handle them in your app.
 | `DECLINE_CALL` | `"decline_call"` | Decline incoming call | — |
 | `HANG_UP` | `"hang_up"` | Hang up active call | — |
 
-Note: `open_chat` has special routing — if Whatgram is not already active, `PhonePage` opens it first and then immediately forwards the event. You do not need to handle this in your app unless you are building a Whatgram replacement.
+Note: `open_chat` has special routing — if Whatgram is not already active, `DevicePage` opens it first and then immediately forwards the event. You do not need to handle this in your app unless you are building a Whatgram replacement.
 
 ### App-level actions (forwarded to handleEvent)
 
@@ -102,22 +102,30 @@ evb.addEventBinding(
 
 The `@` prefix is stripped from the key name before the event reaches `handleEvent`. `event.getParam("MessageValue")` retrieves the captured value; the key in `getParam` does not include `@`.
 
-## PhoneEventData codec fields
+## Event payload decoding
 
-The following fields are decoded from the raw UI event by `PhonePage.PhoneEventData.CODEC`. They map to `PhoneEvent` params as shown:
+`DevicePage` decodes the raw UI event into a generic `Map<String, String>` and
+builds a `PhoneEvent` from it. **`Action` and `App` are reserved**; every other
+string field is preserved and reachable via `event.getParam(key)` /
+`event.getParams()`. The `@` capture prefix is stripped during decode.
 
-| Codec key | PhoneEvent param key | Description |
-|-----------|----------------------|-------------|
-| `Action` | `getAction()` | Action name |
-| `App` | `getAppId()` | App ID for `open_app` |
-| `Contact` | `getParam("Contact")` | Phone number |
-| `@MessageValue` | `getParam("MessageValue")` | Captured text input |
-| `@ContactFormNumber` | `getParam("ContactFormNumber")` | Captured form input |
-| `@ContactFormName` | `getParam("ContactFormName")` | Captured form input |
-| `@DialNumber` | `getParam("DialNumber")` | Captured dial input |
-| `State` | `getParam("State")` | Integer state (as string) |
+This means app-owned payload keys work without registering them anywhere:
 
-To pass a value not in this table from your app's UI events, you must use one of the existing codec fields. Custom payload fields outside this set are not decoded by the current codec.
+```java
+// binding
+EventData.of("Action", "amazon_view").append("ProductId", product.id())
+// handler
+event.getParam("ProductId")   // → the value
+```
+
+Reserved / compatibility keys in use by the built-ins:
+
+| Key | Access | Notes |
+|---|---|---|
+| `Action` | `getAction()` | reserved |
+| `App` | `getAppId()` | reserved (for `open_app`) |
+| `Contact`, `MessageValue`, `ContactFormNumber`, `ContactFormName`, `DialNumber` | `getParam(...)` | built-in app payloads |
+| `State` | `getParam("State")` | integer state as string |
 
 ## Handling events
 

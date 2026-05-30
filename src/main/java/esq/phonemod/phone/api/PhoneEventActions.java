@@ -13,7 +13,7 @@ public final class PhoneEventActions {
     private PhoneEventActions() {
     }
 
-    // ── Phone-level — handled by PhonePage before reaching any app ────────────
+    // ── Phone-level — handled by DevicePage before reaching any app ───────────
 
     /**
      * Return to the home screen (app menu). Fired by the bottom-bar home button.

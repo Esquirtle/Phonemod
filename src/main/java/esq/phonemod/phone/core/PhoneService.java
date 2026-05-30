@@ -1,15 +1,16 @@
 package esq.phonemod.phone.core;
 
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import esq.phonemod.device.core.DeviceService;
 import esq.phonemod.phone.api.PhoneApp;
-import esq.phonemod.phone.ui.PhonePage;
 
 import javax.annotation.Nonnull;
 import java.util.List;
 
 /**
- * Core phone platform service. Manages registered apps and creates phone pages.
+ * Core phone platform service. Manages registered apps.
+ *
+ * <p>Page creation lives in the device framework ({@code DeviceService} /
+ * {@code DevicePage}); the legacy {@code PhonePage} path has been removed.
  */
 public final class PhoneService {
 
@@ -46,11 +47,5 @@ public final class PhoneService {
     @Nonnull
     public List<PhoneApp<?>> getApps() {
         return this.appRegistry.getApps();
-    }
-
-    @Nonnull
-    public PhonePage createPhonePage(@Nonnull PlayerRef playerRef,
-                                    @Nonnull String phoneNumber) {
-        return new PhonePage(playerRef, phoneNumber);
     }
 }

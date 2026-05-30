@@ -132,5 +132,14 @@ public final class DeviceShell {
         String selector = selectors.get(key);
         return selector != null && !selector.isBlank() ? selector : fallback;
     }
+
+    /**
+     * All declared selectors for this device as a map of <em>role &rarr; selector</em>.
+     * Used by the theming system to map palette roles onto on-screen elements.
+     */
+    @Nonnull
+    public Map<String, String> getSelectors() {
+        return selectors != null ? Collections.unmodifiableMap(selectors) : Collections.emptyMap();
+    }
 }
 

@@ -1,95 +1,46 @@
 package esq.phonemod.phone.apps.helpers;
 
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.ui.builder.EventData;
-import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
-import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import esq.phonemod.phone.components.PhoneOwnerComponent;
-
-import javax.annotation.Nonnull;
-import java.util.Map;
-
-/** Static helpers that build the Contacts app UI state. */
+/**
+ * Selector and asset-path constants for the Contacts UI.
+ *
+ * <p>Pure constants, referenced by {@link esq.phonemod.phone.apps.ContactsApp}.
+ * None of these is the shell content area — apps get that from
+ * {@code PhoneAppContext.getContentSelector()}.
+ */
 public final class Contacts {
-
-    static final String CONTACTS_UI       = "Pages/Phone/Contacts.ui";
-    static final String CONTACTS_ENTRY_UI = "Pages/Phone/Components/ContactsEntry.ui";
-    static final String CONTACTS_ADD_UI   = "Pages/Phone/Components/ContactsAdd.ui";
-
-    private static final String CONTENT = "#AppContent";
 
     private Contacts() {}
 
-    /**
-     * Clears {@code #AppContent} and renders the contacts list for the given phone number.
-     * Each row has a Chat button ({@code open_chat}) and a Remove button ({@code remove_contact}).
-     * An Add Contact button at the top fires {@code open_add_contact}.
-     */
-    public static void loadContactsState(@Nonnull String phoneNumber,
-                                          @Nonnull Store<EntityStore> store,
-                                          @Nonnull Ref<EntityStore> ref,
-                                          @Nonnull UICommandBuilder cmd,
-                                          @Nonnull UIEventBuilder evb) {
-        cmd.clear(CONTENT);
-        cmd.append(CONTENT, CONTACTS_UI);
+    // ── UI file paths ─────────────────────────────────────────────────────────
 
-        evb.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#AddContactButton",
-                EventData.of("Action", "open_add_contact"),
-                false);
+    public static final String CONTACTS_ENTRY_UI = "Pages/Phone/Components/DustContactsEntry.ui";
+    public static final String CONTACTS_ADD_UI   = "Pages/Phone/Components/DustContactsAdd.ui";
 
-        PhoneOwnerComponent owner =
-                store.ensureAndGetComponent(ref, PhoneOwnerComponent.getComponentType());
-        Map<String, String> contacts = owner.getContacts(phoneNumber);
-        int i = 0;
-        for (Map.Entry<String, String> entry : contacts.entrySet()) {
-            String number      = entry.getKey();
-            String displayName = entry.getValue();
-            cmd.append("#ContactsList", CONTACTS_ENTRY_UI);
-            cmd.set("#ContactsList[" + i + "] #ContactName.Text", displayName + " (" + number + ")");
-            evb.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    "#ContactsList[" + i + "] #ChatButton",
-                    EventData.of("Action", "open_chat").append("Contact", number),
-                    false);
-            evb.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    "#ContactsList[" + i + "] #RemoveButton",
-                    EventData.of("Action", "remove_contact").append("Contact", number),
-                    false);
-            evb.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    "#ContactsList[" + i + "] #CallButton",
-                    EventData.of("Action", "start_call").append("Contact", number),
-                    false);
-            i++;
-        }
-    }
+    // ── Themeable root surfaces (one source of truth; see getThemeableSelectors) ─
 
-    /**
-     * Clears {@code #AppContent} and renders the add-contact inline form.
-     * Save fires {@code save_contact} with form values; Cancel fires {@code contacts}.
-     */
-    public static void loadAddContactState(@Nonnull UICommandBuilder cmd,
-                                            @Nonnull UIEventBuilder evb) {
-        cmd.clear(CONTENT);
-        cmd.append(CONTENT, CONTACTS_ADD_UI);
+    /** Themeable header surface (role: appHeader). */
+    public static final String SEL_HEADER                  = "#ContactsHeader";
+    /** Themeable panel surface (role: appPanel). */
+    public static final String SEL_PANEL                   = "#ContactsPanel";
 
-        evb.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#SaveButton",
-                EventData.of("Action", "save_contact")
-                        .append("@ContactFormNumber", "#NumberInput.Value")
-                        .append("@ContactFormName", "#NameInput.Value"),
-                false);
-        evb.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#CancelButton",
-                EventData.of("Action", "contacts"),
-                false);
-    }
+    // ── Contacts-list view (root page selectors) ──────────────────────────────
+
+    /** Scrollable list that contact-entry rows are appended into. Themeable (role: appContent). */
+    public static final String SEL_CONTACTS_LIST           = "#ContactsList";
+    public static final String SEL_ADD_CONTACT_BUTTON      = "#AddContactButton";
+    /** Relative: contact name label inside a contacts-entry row. */
+    public static final String SEL_ENTRY_CONTACT_NAME_TEXT = "#ContactName.Text";
+    /** Relative: chat button inside a contacts-entry row. */
+    public static final String SEL_ENTRY_CHAT_BUTTON       = "#ChatButton";
+    /** Relative: remove button inside a contacts-entry row. */
+    public static final String SEL_ENTRY_REMOVE_BUTTON     = "#RemoveButton";
+    /** Relative: call button inside a contacts-entry row. */
+    public static final String SEL_ENTRY_CALL_BUTTON       = "#CallButton";
+
+    // ── Add-contact form (DustContactsAdd.ui) ─────────────────────────────────
+
+    public static final String SEL_SAVE_BUTTON        = "#SaveButton";
+    public static final String SEL_CANCEL_BUTTON      = "#CancelButton";
+    public static final String SEL_NUMBER_INPUT_VALUE = "#NumberInput.Value";
+    public static final String SEL_NAME_INPUT_VALUE   = "#NameInput.Value";
 }

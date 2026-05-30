@@ -21,24 +21,24 @@ public final class PhoneAssetPaths {
     /** The outer phone shell UI (background, top bar, bottom bar). */
     public static final String PHONE_UI = "Pages/Phone/Phone.ui";
 
-    // ── Built-in app UI roots (loaded into #AppContent) ───────────────────────
+    // ── App button (home-grid icon) fragments ─────────────────────────────────
 
-    public static final String WHATGRAM_UI = "Pages/Phone/Whatgram.ui";
-    public static final String CONTACTS_UI = "Pages/Phone/Contacts.ui";
-    public static final String CALLS_UI = "Pages/Phone/Calls.ui";
-    public static final String SETTINGS_UI = "Pages/Phone/Settings.ui";
+    public static final String WHATGRAM_BUTTON_UI = "Pages/Phone/Components/WhatgramButton.ui";
+    public static final String CONTACTS_BUTTON_UI = "Pages/Phone/Components/ContactsButton.ui";
+    public static final String CALLS_BUTTON_UI = "Pages/Phone/Components/CallsButton.ui";
+    public static final String SETTINGS_BUTTON_UI = "Pages/Phone/Components/SettingsButton.ui";
 
-    // ── Component fragments (appended into list containers) ───────────────────
+    // ── App UI roots (loaded into #AppContent) ────────────────────────────────
+    // Built on the Dust component library (DustLib.ui) and themed at runtime by
+    // ThemeService. The per-app render paths for appended fragments live in the
+    // app helper classes (Whatgram / Contacts / Calls).
 
-    public static final String WHATGRAM_CHAT_ENTRY_UI = "Pages/Phone/Components/WhatgramChatEntry.ui";
-    public static final String WHATGRAM_CHAT_UI = "Pages/Phone/Components/WhatgramChat.ui";
-    public static final String WHATGRAM_BUBBLE_UI = "Pages/Phone/Components/WhatgramMessageBubble.ui";
+    public static final String DUST_WHATGRAM_UI = "Pages/Phone/DustWhatgram.ui";
+    public static final String DUST_CONTACTS_UI = "Pages/Phone/DustContacts.ui";
+    public static final String DUST_CALLS_UI = "Pages/Phone/DustCalls.ui";
+    public static final String DUST_SETTINGS_UI = "Pages/Phone/DustSettings.ui";
+    public static final String DUST_APPSTORE_UI = "Pages/Phone/DustAppStore.ui";
 
-    public static final String CONTACTS_ENTRY_UI = "Pages/Phone/Components/ContactsEntry.ui";
-    public static final String CONTACTS_ADD_UI = "Pages/Phone/Components/ContactsAdd.ui";
-
-    public static final String CALL_HISTORY_ENTRY_UI = "Pages/Phone/Components/CallHistoryEntry.ui";
-    public static final String INCOMING_CALL_UI = "Pages/Phone/Components/IncomingCall.ui";
-    public static final String ACTIVE_CALL_UI = "Pages/Phone/Components/ActiveCall.ui";
+    public static final String APPSTORE_BUTTON_UI = "Pages/Phone/Components/AppStoreButton.ui";
 
 }

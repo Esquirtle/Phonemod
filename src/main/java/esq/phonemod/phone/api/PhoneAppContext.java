@@ -40,17 +40,20 @@ public final class PhoneAppContext {
     private final PlayerRef playerRef;
     private final String phoneNumber;
     private final String appId;
+    private final String contentSelector;
 
     public PhoneAppContext(@Nonnull Ref<EntityStore> ref,
             @Nonnull Store<EntityStore> store,
             @Nonnull PlayerRef playerRef,
             @Nonnull String phoneNumber,
-            @Nonnull String appId) {
+            @Nonnull String appId,
+            @Nonnull String contentSelector) {
         this.ref = ref;
         this.store = store;
         this.playerRef = playerRef;
         this.phoneNumber = phoneNumber;
         this.appId = appId;
+        this.contentSelector = contentSelector;
     }
 
     // ── Identity ──────────────────────────────────────────────────────────────
@@ -79,6 +82,17 @@ public final class PhoneAppContext {
     @Nonnull
     public String getAppId() {
         return appId;
+    }
+
+    /**
+     * Returns the device shell's content-area selector (e.g. {@code "#AppContent"}),
+     * sourced from the device asset. This is the region an app's root UI is loaded
+     * into. Apps should target this only to replace their whole view; to update a
+     * list or sub-region, use the app's own named selectors instead.
+     */
+    @Nonnull
+    public String getContentSelector() {
+        return contentSelector;
     }
 
     private String getSessionKey() {

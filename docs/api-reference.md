@@ -21,7 +21,7 @@ Human-readable name shown on the app icon label in `AppMenu`.
 ```java
 String getAppButtonUI()
 ```
-Path to the `.ui` file that defines this app's button in the AppMenu grid (e.g. `"Pages/Phone/Components/WhatgramButton.ui"`). The file must declare a root `Group #APPBUTTONENTRY` containing a `TextButton #APPBUTTON` (with the icon hardcoded in its `Default` style) and a `Label #APPNAME`. AppMenu sets the label text dynamically after appending the file. Third-party plugins should use their own asset namespace (e.g. `"Pages/Playground/AppIcon.ui"`).
+Path to the `.ui` file that defines this app's button in the home grid (e.g. `"Pages/Phone/Components/WhatgramButton.ui"`). The file must declare a root `Group #APPBUTTONENTRY` containing a `TextButton #APPBUTTON` (with the icon baked into its `Default` style, typically via `@PhoneAppButton`'s `@Icon`) and a `Label #APPNAME`. `DevicePage` sets the label text dynamically after appending the file. Third-party plugins should use their own asset namespace (e.g. `"Pages/Playground/AppIcon.ui"`).
 
 ```java
 String getUIPath()
@@ -60,17 +60,17 @@ Called when the player navigates away from this app (home button, or opening ano
 default boolean onIncomingMessage(PhoneAppContext ctx, String fromNumber,
                                   UICommandBuilder cmd, UIEventBuilder evb)
 ```
-Called by `PhonePage` when a message arrives while this app is open. Return `true` to send `cmd`/`evb` as the UI update directly — no full rebuild. Return `false` to fall back to `build()`. Use the `true` path to append a single message bubble without clearing and re-rendering the whole chat.
+Called by `DevicePage` when a message arrives while this app is open. Return `true` to send `cmd`/`evb` as the UI update directly — no full rebuild. Return `false` to fall back to `build()`. Use the `true` path to append a single message bubble without clearing and re-rendering the whole chat.
 
 ```java
 default void onIncomingMessage(PhoneAppContext ctx, String fromNumber)
 ```
-Fallback called by `PhonePage` only when the 4-arg overload returns `false`. `build()` is called automatically after this returns. Override this to update state before the rebuild (e.g. mark a message as read). If you override the 4-arg version and return `true`, this method is not called.
+Fallback called by `DevicePage` only when the 4-arg overload returns `false`. `build()` is called automatically after this returns. Override this to update state before the rebuild (e.g. mark a message as read). If you override the 4-arg version and return `true`, this method is not called.
 
 ```java
 default void onIncomingCall(PhoneAppContext ctx, String callerNumber, String callerName)
 ```
-Called by `PhonePage` when an incoming call arrives while this app is open. `build()` is called automatically after this hook returns.
+Called by `DevicePage` when an incoming call arrives while this app is open. `build()` is called automatically after this hook returns.
 
 ---
 
@@ -96,14 +96,9 @@ protected void setState(@Nonnull PhoneAppContext ctx, @Nonnull S state)
 Persists `state` for the player identified by `ctx`. Stored under the reserved key `__state__` in `ctx`'s per-player state map.
 
 ```java
-protected void appendMainUI(@Nonnull UICommandBuilder cmd)
+protected void appendMainUI(@Nonnull PhoneAppContext ctx, @Nonnull UICommandBuilder cmd)
 ```
-Convenience: calls `cmd.clear(CONTENT_SELECTOR)` then `cmd.append(CONTENT_SELECTOR, getUIPath())`. Call this at the top of every `build()` implementation to reset the content area before populating it.
-
-```java
-protected static final String CONTENT_SELECTOR = "#AppContent"
-```
-The UI selector for the main content area. Use this constant in `cmd.clear()` and `cmd.append()` calls.
+Clears the shell content area (`ctx.getContentSelector()`, sourced from `DeviceShell` — never hardcode `"#AppContent"`) and appends this app's `getUIPath()` into it. Call it once at the top of `build()`; it is the only place an app should touch the content area (see the set/append/clear contract on `PhoneUi`).
 
 ---
 
@@ -111,7 +106,7 @@ The UI selector for the main content area. Use this constant in `cmd.clear()` an
 
 `esq.phonemod.phone.api.PhoneAppContext`
 
-Per-player session context. Created by `PhonePage` for each app method invocation. Provides ECS access, identity, and isolated per-player state storage.
+Per-player session context. Created by `DevicePage` for each app method invocation. Provides ECS access, identity, and isolated per-player state storage.
 
 ### Identity
 
@@ -182,7 +177,7 @@ Sends an in-game notification toast to this player via `NotificationUtil`.
 
 `esq.phonemod.phone.api.PhoneEvent`
 
-Immutable event payload created by `PhonePage` from the raw UI codec event.
+Immutable event payload created by `DevicePage` from the raw UI codec event.
 
 ```java
 @Nonnull String getAction()
@@ -242,10 +237,8 @@ Returns the app registered under `appId`, or `null` if not found.
 ```
 Returns all registered apps sorted by `getSortOrder()` ascending. Unmodifiable.
 
-```java
-@Nonnull PhonePage createPhonePage(@Nonnull PlayerRef playerRef, @Nonnull String phoneNumber)
-```
-Creates a new `PhonePage` instance bound to the given player and phone number.
+> Page creation lives in the device framework: `DeviceService.createDevicePage(session)`
+> (a session built from a `DeviceAsset`). `PhoneService` itself only manages apps.
 
 ---
 
