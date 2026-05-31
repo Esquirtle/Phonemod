@@ -3,15 +3,13 @@ package esq.phonemod.phone.messaging;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.Message;
-import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.util.NotificationUtil;
 import esq.phonemod.device.api.DevicePageHandle;
+import esq.phonemod.device.events.PhoneNotification;
+import esq.phonemod.device.events.PhoneNotifications;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
 
 import javax.annotation.Nonnull;
@@ -34,14 +32,26 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class PhoneRegistry {
 
-    private static final int MESSAGE_RECEIVED_SOUND = SoundEvent.getAssetMap()
-            .getIndex("Notification_Message_Received");
+    /**
+     * Sound event ID for an incoming message. Resolved to an index lazily at call time
+     * (see {@link #deliver}) because asset indices are not guaranteed to be loaded when
+     * this class is first referenced during plugin {@code setup()}.
+     */
+    private static final String MESSAGE_RECEIVED_SOUND_ID = "Notification_Message_Received";
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
-    /** phone number → session entry for players whose phone is currently open. */
+    /** phone number → session entry for players whose phone UI is currently OPEN. */
     private static final ConcurrentHashMap<String, OnlineEntry> online = new ConcurrentHashMap<>();
 
-    /** phone number → received messages this session (for inbox conversation list). */
+    /**
+     * phone number → last-known session entry for players who are CONNECTED and own this
+     * phone, whether or not the phone UI is currently open. Lets messages/notifications
+     * reach a player whose phone is closed (toast + persisted history) rather than being
+     * deferred to the offline queue. Cleared on disconnect.
+     */
+    private static final ConcurrentHashMap<String, OnlineEntry> presence = new ConcurrentHashMap<>();
+
+    /** phone number → messages queued while the owner was fully offline (disconnected). */
     private static final ConcurrentHashMap<String, List<TextMessage>> inboxes = new ConcurrentHashMap<>();
 
     private PhoneRegistry() {}
@@ -58,18 +68,57 @@ public final class PhoneRegistry {
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull World world,
                                 @Nonnull DevicePageHandle page) {
-        online.put(phoneNumber, new OnlineEntry(ref, playerRef, store, world, page));
-        LOGGER.atInfo().log("[PhoneRegistry] Registered phone %s", phoneNumber);
+        OnlineEntry entry = new OnlineEntry(ref, playerRef, store, world, page);
+        online.put(phoneNumber, entry);
+        presence.put(phoneNumber, entry);
+        LOGGER.atFine().log("[PhoneRegistry] Registered phone %s", phoneNumber);
+
+        // Drain any messages that arrived while this number was offline into the
+        // recipient's persistent conversation history, so they appear in the chat
+        // thread (not just the conversation list) the next time the phone opens.
+        List<TextMessage> pending = inboxes.remove(phoneNumber);
+        if (pending != null && !pending.isEmpty()) {
+            final List<TextMessage> snapshot;
+            synchronized (pending) {
+                snapshot = new ArrayList<>(pending);
+            }
+            world.execute(() -> {
+                for (TextMessage tm : snapshot) {
+                    persistMessage(store, ref, phoneNumber, tm.fromNumber(),
+                            new ChatMessage(false, tm.fromName(), tm.body()));
+                }
+                LOGGER.atFine().log("[PhoneRegistry] Delivered %d queued message(s) to %s",
+                        snapshot.size(), phoneNumber);
+            });
+        }
     }
 
     /**
-     * Removes the online entry whose {@link Ref} matches the given ref.
+     * Removes the OPEN-UI entry for {@code phoneNumber}, but only if it still refers to the
+     * given page instance. Called from {@code DevicePage.onDismiss} when the phone UI closes.
+     * Presence is intentionally retained so the player keeps receiving toasts while connected.
+     * The page-instance guard avoids a race where a freshly re-opened page is wiped by the
+     * dismiss of the page it replaced.
+     */
+    public static void unregisterPage(@Nonnull String phoneNumber, @Nonnull DevicePageHandle page) {
+        online.computeIfPresent(phoneNumber, (k, e) -> {
+            if (e.page() == page) {
+                LOGGER.atFine().log("[PhoneRegistry] Phone %s UI closed", phoneNumber);
+                return null;
+            }
+            return e;
+        });
+    }
+
+    /**
+     * Removes all entries (open + presence) whose {@link Ref} matches the given ref.
      * Called when a player disconnects — the phone number is not known at that point.
      */
     public static void unregisterByRef(@Nonnull Ref<EntityStore> ref) {
-        online.entrySet().removeIf(entry -> {
+        online.values().removeIf(e -> e.ref().equals(ref));
+        presence.entrySet().removeIf(entry -> {
             if (entry.getValue().ref().equals(ref)) {
-                LOGGER.atInfo().log("[PhoneRegistry] Unregistered phone %s (disconnect)", entry.getKey());
+                LOGGER.atFine().log("[PhoneRegistry] Unregistered phone %s (disconnect)", entry.getKey());
                 return true;
             }
             return false;
@@ -88,38 +137,55 @@ public final class PhoneRegistry {
      * </ol>
      */
     public static void deliver(@Nonnull String toNumber, @Nonnull TextMessage message) {
-        LOGGER.atInfo().log("[PhoneRegistry] deliver to=%s from=%s body=%s", toNumber, message.fromNumber(), message.body());
+        LOGGER.atFine().log("[PhoneRegistry] deliver to=%s from=%s", toNumber, message.fromNumber());
+
+        OnlineEntry openEntry = online.get(toNumber);
+        if (openEntry != null) {
+            // Phone UI open: persist, toast (+sound), and live-push the chat view.
+            deliverToLoaded(openEntry, toNumber, message, true);
+            return;
+        }
+
+        OnlineEntry presentEntry = presence.get(toNumber);
+        if (presentEntry != null) {
+            // Connected but phone closed: persist and toast (+sound); no live push.
+            // The message is in history, so it shows when they next open the phone.
+            deliverToLoaded(presentEntry, toNumber, message, false);
+            return;
+        }
+
+        // Fully offline: queue for delivery when the owner next connects/opens their phone
+        // (drained into persistent history by register()).
         inboxes.computeIfAbsent(toNumber, k -> Collections.synchronizedList(new ArrayList<>()))
                .add(message);
+        LOGGER.atFine().log("[PhoneRegistry] recipient %s offline; queued message", toNumber);
+    }
 
-        OnlineEntry recipientEntry = online.get(toNumber);
-        if (recipientEntry != null) {
-            final ChatMessage receivedMsg = new ChatMessage(false, message.fromName(), message.body());
-            final OnlineEntry re = recipientEntry;
-            re.world().execute(() -> {
-                persistMessage(re.store(), re.ref(), toNumber, message.fromNumber(), receivedMsg);
-                try {
-                    NotificationUtil.sendNotification(
-                            re.playerRef().getPacketHandler(),
-                            Message.raw(message.fromName()).color("#43D69A"),
-                            Message.raw(message.body())
-                    );
-                    if (MESSAGE_RECEIVED_SOUND != 0) {
-                        SoundUtil.playSoundEvent2d(
-                                re.ref(),
-                                MESSAGE_RECEIVED_SOUND,
-                                SoundCategory.UI,
-                                re.store());
-                    }
-                } catch (Exception e) {
-                    LOGGER.atWarning().withCause(e).log("[PhoneRegistry] Failed to notify %s", toNumber);
-                }
-                LOGGER.atInfo().log("[PhoneRegistry] push incoming message to page for %s from=%s", toNumber, message.fromNumber());
-                re.page().onIncomingMessage(message.fromNumber());
-            });
-        } else {
-            LOGGER.atInfo().log("[PhoneRegistry] recipient %s is offline or not registered", toNumber);
-        }
+    /**
+     * Persists {@code message} to the recipient's history and shows a toast (+sound), running
+     * on the recipient's world thread. When {@code livePush} is true and the phone UI is open,
+     * also pushes the incoming message into the live chat view.
+     */
+    private static void deliverToLoaded(@Nonnull OnlineEntry entry,
+                                        @Nonnull String toNumber,
+                                        @Nonnull TextMessage message,
+                                        boolean livePush) {
+        final ChatMessage receivedMsg = new ChatMessage(false, message.fromName(), message.body());
+        entry.world().execute(() -> {
+            persistMessage(entry.store(), entry.ref(), toNumber, message.fromNumber(), receivedMsg);
+            try {
+                PhoneNotification notification = PhoneNotification
+                        .info(Message.raw(message.fromName()).color("#43D69A"),
+                                Message.raw(message.body()))
+                        .withSound(MESSAGE_RECEIVED_SOUND_ID);
+                PhoneNotifications.send(entry.playerRef(), entry.ref(), entry.store(), notification);
+            } catch (Exception e) {
+                LOGGER.atWarning().withCause(e).log("[PhoneRegistry] Failed to notify %s", toNumber);
+            }
+            if (livePush) {
+                entry.page().onIncomingMessage(message.fromNumber());
+            }
+        });
     }
 
     // ── Persistence helpers ───────────────────────────────────────────────────
@@ -138,8 +204,11 @@ public final class PhoneRegistry {
     // ── Inbox ─────────────────────────────────────────────────────────────────
 
     /**
-     * Returns an unmodifiable view of received messages this session.
-     * Used by the Whatgram conversation list to enumerate contacts.
+     * Returns an unmodifiable view of messages queued for {@code phoneNumber} while it was
+     * offline and not yet drained into persistent history. For an online phone this is
+     * normally empty (messages go straight to {@link ConversationHistoryComponent}); the
+     * Whatgram conversation list enumerates contacts from history and merges this as a
+     * fallback.
      */
     @Nonnull
     public static List<TextMessage> getInbox(@Nonnull String phoneNumber) {

@@ -184,7 +184,7 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
 
         if (PhoneEventActions.OPEN_CHAT.equals(action)) {
             String contact = event.getParam("Contact");
-            LOGGER.atInfo().log("[WhatgramApp] open_chat phone=%s contact=%s state=%s",
+            LOGGER.atFine().log("[WhatgramApp] open_chat phone=%s contact=%s state=%s",
                     ctx.getPhoneNumber(), contact, getState(ctx));
             if (contact != null && !contact.isBlank()) {
                 ctx.setState(KEY_CONTACT, contact);
@@ -197,7 +197,7 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
 
         if (PhoneEventActions.START_CALL.equals(action)) {
             String target = event.getParam("Contact");
-            LOGGER.atInfo().log("[WhatgramApp] start_call phone=%s target=%s",
+            LOGGER.atFine().log("[WhatgramApp] start_call phone=%s target=%s",
                     ctx.getPhoneNumber(), target);
             if (target != null && !target.isBlank()) {
                 DeviceService.get().getCallService()
@@ -208,7 +208,7 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
         }
 
         if (PhoneEventActions.BACK.equals(action)) {
-            LOGGER.atInfo().log("[WhatgramApp] back phone=%s state=%s",
+            LOGGER.atFine().log("[WhatgramApp] back phone=%s state=%s",
                     ctx.getPhoneNumber(), getState(ctx));
             ctx.clearState(KEY_CONTACT);
             setState(ctx, State.CONVERSATION_LIST);
@@ -238,7 +238,7 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
 
         String trimmedBody = body.trim();
         String myNumber = ctx.getPhoneNumber();
-        LOGGER.atInfo().log("[WhatgramApp] send_message phone=%s contact=%s body=%s",
+        LOGGER.atFine().log("[WhatgramApp] send_message phone=%s contact=%s body=%s",
                 myNumber, currentContact, trimmedBody);
 
         // Persist outgoing message locally.
@@ -269,7 +269,7 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
     public boolean onIncomingMessage(PhoneAppContext ctx, String fromNumber,
             UICommandBuilder cmd, UIEventBuilder evb) {
         String currentContact = ctx.getState(KEY_CONTACT);
-        LOGGER.atInfo().log("[WhatgramApp] onIncomingMessage phone=%s from=%s currentContact=%s state=%s",
+        LOGGER.atFine().log("[WhatgramApp] onIncomingMessage phone=%s from=%s currentContact=%s state=%s",
                 ctx.getPhoneNumber(), fromNumber, currentContact, getState(ctx));
         if (getState(ctx) == State.CHAT && fromNumber.equals(currentContact)) {
             // Rebuild the whole list from history (a partial update to
@@ -316,7 +316,7 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
             int index,
             UICommandBuilder cmd,
             Map<String, String> contacts) {
-        LOGGER.atInfo().log("[WhatgramApp] appendBubble phone=%s contact=%s index=%d fromMe=%s",
+        LOGGER.atFine().log("[WhatgramApp] appendBubble phone=%s contact=%s index=%d fromMe=%s",
                 ctx.getPhoneNumber(), contactNumber, index, msg.fromMe());
         String row = PhoneUi.appendListItem(cmd, Whatgram.SEL_CONTENT_LIST, Whatgram.BUBBLE_UI, index);
         String senderName = msg.fromMe() ? "You"

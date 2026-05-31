@@ -11,6 +11,7 @@ import esq.phonemod.phone.apps.ContactsApp;
 import esq.phonemod.phone.apps.SettingsApp;
 import esq.phonemod.phone.apps.WhatgramApp;
 import esq.phonemod.phone.core.PhoneService;
+import esq.phonemod.phone.messaging.CallRegistry;
 
 public class SetupManager {
     private final AssetRegistryManager assetRegistryManager;
@@ -34,6 +35,7 @@ public class SetupManager {
     protected void start() {
         registerAssets();
         registerComponents();
+        registerEvents();
         registerCommands();
         registerInteractions();
         registerApps();
@@ -67,11 +69,15 @@ public class SetupManager {
 
     public void registerComponents() {
         componentRegistryManager.register();
+    }
+
+    public void registerEvents() {
         eventRegistryManager.register();
     }
 
     public void initializeRuntime() {
         componentRegistryManager.registerSystems();
+        CallRegistry.startTimeoutWatcher();
     }
 
     public void registerCommands() {
@@ -83,6 +89,7 @@ public class SetupManager {
     }
 
     public void shutdown() {
+        CallRegistry.stopTimeoutWatcher();
         PhoneEvents.unsubscribeAll(DeviceSettingsChangedEvent.class);
     }
 }

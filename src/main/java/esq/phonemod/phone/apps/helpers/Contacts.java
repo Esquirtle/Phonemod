@@ -14,7 +14,6 @@ public final class Contacts {
     // ── UI file paths ─────────────────────────────────────────────────────────
 
     public static final String CONTACTS_ENTRY_UI = "Pages/Phone/Components/DustContactsEntry.ui";
-    public static final String CONTACTS_ADD_UI   = "Pages/Phone/Components/DustContactsAdd.ui";
 
     // ── Themeable root surfaces (one source of truth; see getThemeableSelectors) ─
 
@@ -25,6 +24,10 @@ public final class Contacts {
 
     // ── Contacts-list view (root page selectors) ──────────────────────────────
 
+    /** List-view container (holds #ContactsList); toggled against the add form. */
+    public static final String SEL_LIST_VIEW               = "#ContactsListView";
+    /** Add-contact form container; a hidden sibling revealed in ADD_CONTACT state. */
+    public static final String SEL_ADD_VIEW                = "#ContactsAddView";
     /** Scrollable list that contact-entry rows are appended into. Themeable (role: appContent). */
     public static final String SEL_CONTACTS_LIST           = "#ContactsList";
     public static final String SEL_ADD_CONTACT_BUTTON      = "#AddContactButton";
@@ -37,7 +40,7 @@ public final class Contacts {
     /** Relative: call button inside a contacts-entry row. */
     public static final String SEL_ENTRY_CALL_BUTTON       = "#CallButton";
 
-    // ── Add-contact form (DustContactsAdd.ui) ─────────────────────────────────
+    // ── Add-contact form (hidden sibling #ContactsAddView inside DustContacts.ui) ─
 
     public static final String SEL_SAVE_BUTTON        = "#SaveButton";
     public static final String SEL_CANCEL_BUTTON      = "#CancelButton";

@@ -96,7 +96,7 @@ public final class OpenPhone extends SimpleInstantInteraction {
             ItemStack stamped = heldItem.withMetadata(metadataKey, new BsonString(deviceId));
             context.getHeldItemContainer().setItemStackForSlot(context.getHeldItemSlot(), stamped);
             context.setHeldItem(stamped);
-            LOGGER.atInfo().log("[OpenPhone] Assigned new device ID %s to item (key=%s)", deviceId, metadataKey);
+            LOGGER.atFine().log("[OpenPhone] Assigned new device ID %s to item (key=%s)", deviceId, metadataKey);
         }
 
         // Build the session and page on the tick thread so the page reference is

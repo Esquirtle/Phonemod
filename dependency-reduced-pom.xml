@@ -86,14 +86,14 @@
       <artifactId>hytale-server</artifactId>
       <version>LOCAL</version>
       <scope>system</scope>
-      <systemPath>${hytale.install-dir}/Hytale/install/${hytale.patchline}/package/game/latest/Server/HytaleServer.jar</systemPath>
+      <systemPath>/home/ed/hytale/WORKSPACE/dev/HytaleServer.jar</systemPath>
     </dependency>
   </dependencies>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <hytale.patchline>pre-release</hytale.patchline>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <hytale.install-dir>${user.home}/AppData/Roaming</hytale.install-dir>
+    <hytale.install-dir>/home/ed/hytale/WORKSPACE/dev/HytaleServer.jar</hytale.install-dir>
     <phonemod.assets.dir>C:\Users\ed\IdeaProjects\Phonemod-Assets</phonemod.assets.dir>
   </properties>
 </project>

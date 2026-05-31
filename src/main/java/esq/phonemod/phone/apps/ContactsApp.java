@@ -87,6 +87,13 @@ public final class ContactsApp extends StatefulPhoneApp<ContactsApp.State> {
     // ── Rendering ─────────────────────────────────────────────────────────────
 
     private void renderContactsState(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
+        // Show the list view, hide the add form — both live in the single root, so
+        // the themed selectors (#ContactsHeader/#ContactsPanel) stay alive and we
+        // never replace the shell content area.
+        PhoneUi.setVisible(cmd, Contacts.SEL_LIST_VIEW, true);
+        PhoneUi.setVisible(cmd, Contacts.SEL_ADD_VIEW, false);
+        PhoneUi.setVisible(cmd, Contacts.SEL_ADD_CONTACT_BUTTON, true);
+
         PhoneUi.safeClear(cmd, Contacts.SEL_CONTACTS_LIST);
 
         // The add-contact button is defined in the DustContacts root; bind it.
@@ -115,7 +122,12 @@ public final class ContactsApp extends StatefulPhoneApp<ContactsApp.State> {
     }
 
     private void renderAddContactState(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
-        PhoneUi.replace(cmd, ctx.getContentSelector(), Contacts.CONTACTS_ADD_UI);
+        // Toggle to the add form (a hidden sibling in the same root). The shell
+        // content area is never replaced, so #ContactsHeader/#ContactsPanel stay
+        // alive for theme re-application.
+        PhoneUi.setVisible(cmd, Contacts.SEL_LIST_VIEW, false);
+        PhoneUi.setVisible(cmd, Contacts.SEL_ADD_VIEW, true);
+        PhoneUi.setVisible(cmd, Contacts.SEL_ADD_CONTACT_BUTTON, false);
 
         // Capture form values from both input fields in a single binding each.
         PhoneUi.bindAction(evb, Contacts.SEL_SAVE_BUTTON,

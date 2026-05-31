@@ -14,6 +14,14 @@ public interface DevicePageHandle {
 
     void onIncomingCall(@Nonnull String callerNumber, @Nonnull String callerName);
 
+    /**
+     * Shows the caller a "calling…" / ringing view while a placed outgoing call waits
+     * for the callee to answer. Default is a no-op for page implementations that don't
+     * render an outgoing-call state.
+     */
+    default void onOutgoingCall(@Nonnull String calleeNumber, @Nonnull String calleeName) {
+    }
+
     void onCallAnswered(@Nonnull String partnerNumber, @Nonnull String partnerName);
 
     void onCallEnded();

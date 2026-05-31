@@ -33,6 +33,7 @@ import esq.phonemod.phone.api.PhoneEventActions;
 import esq.phonemod.phone.apps.helpers.Calls;
 import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.CallRegistry;
+import esq.phonemod.phone.messaging.PhoneRegistry;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
 
@@ -114,11 +115,21 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         handleEventMap(ref, store, decodeEventMap(rawData));
     }
 
+    @Override
+    public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        super.onDismiss(ref, store);
+        // Mark the phone UI as closed so we stop pushing to a dismissed page and a
+        // re-open never orphans this one. Presence is kept so the player still gets
+        // toasts while connected. Guarded by page identity to avoid wiping a page
+        // that already replaced this one.
+        PhoneRegistry.unregisterPage(session.getDeviceId(), this);
+    }
+
     private void handleEventMap(@Nonnull Ref<EntityStore> ref,
             @Nonnull Store<EntityStore> store,
             @Nonnull Map<String, String> data) {
         String action = data.getOrDefault("Action", "");
-        LOGGER.atInfo().log("[DevicePage] handleDataEvent device=%s app=%s action=%s state=%s",
+        LOGGER.atFine().log("[DevicePage] handleDataEvent device=%s app=%s action=%s state=%s",
                 session.getDeviceId(), data.get("App"), action, session.getCurrentAppId());
 
         if (PhoneEventActions.HOME.equals(action)) {
@@ -189,7 +200,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             }
         }
 
-        LOGGER.atInfo().log("[DevicePage] Unhandled action: %s", action);
+        LOGGER.atFine().log("[DevicePage] Unhandled action: %s", action);
         sendUpdate(null, false);
     }
 
@@ -364,6 +375,21 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         UICommandBuilder cmd = new UICommandBuilder();
         UIEventBuilder evb = new UIEventBuilder();
         Calls.loadIncomingCallState(callerNumber, callerName,
+                session.getShell().getContentSelector(), cmd, evb);
+        sendUpdate(cmd, evb, false);
+    }
+
+    @Override
+    public void onOutgoingCall(@Nonnull String calleeNumber, @Nonnull String calleeName) {
+        if (!session.getShell().hasCapability("calls")) {
+            return;
+        }
+        session.setCurrentState(DevicePageState.ACTIVE_CALL);
+        UICommandBuilder cmd = new UICommandBuilder();
+        UIEventBuilder evb = new UIEventBuilder();
+        // Reuse the active-call overlay with a "Calling…" label until the callee answers;
+        // this matches what build() shows for a pending outgoing call on reopen.
+        Calls.loadActiveCallState(calleeNumber, "Calling… " + calleeName,
                 session.getShell().getContentSelector(), cmd, evb);
         sendUpdate(cmd, evb, false);
     }

@@ -11,7 +11,7 @@ import esq.phonemod.phone.messaging.TextMessage;
 import javax.annotation.Nonnull;
 
 /**
- * {@code /pg sendtext <number> <message>}
+ * {@code /phonemod sendtext <number> <message>}
  *
  * <p>Sends a text message to the specified phone number using the {@code "Server"} identity
  * ({@code "000-000"}). Used for testing the messaging system without a second player.
@@ -26,6 +26,9 @@ public final class SendTextCommand extends CommandBase {
 
     public SendTextCommand() {
         super("sendtext", "Send a text to a phone number as [Server]. Usage: sendtext <number> <message>");
+        // Debug/admin only. Hytale also auto-generates a command permission; this makes the
+        // intent explicit and decouples the node from the command name.
+        requirePermission("phonemod.admin.sendtext");
         this.toArg = withRequiredArg("to", "Target phone number (e.g. 555-1234)", ArgTypes.STRING);
         this.messageArg = withRequiredArg("message", "Message body (can have spaces)", ArgTypes.GREEDY_STRING);
     }
@@ -36,7 +39,7 @@ public final class SendTextCommand extends CommandBase {
         String body = (String) this.messageArg.get(context);
 
         if (to == null || body == null) {
-            context.sendMessage(Message.raw("Usage: /pg sendtext <number> <message>").color("#FF5555"));
+            context.sendMessage(Message.raw("Usage: /phonemod sendtext <number> <message>").color("#FF5555"));
             return;
         }
 
