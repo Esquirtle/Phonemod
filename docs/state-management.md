@@ -95,7 +95,7 @@ public final class MyApp extends StatefulPhoneApp<MyApp.State> {
 
     @Override
     public void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
-        appendMainUI(cmd);
+        appendMainUI(ctx, cmd);
         switch (getState(ctx)) {
             case LIST   -> renderList(ctx, cmd, evb);
             case DETAIL -> renderDetail(ctx, cmd, evb);

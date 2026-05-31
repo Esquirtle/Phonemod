@@ -9,7 +9,7 @@ import javax.annotation.Nonnull;
 import java.util.logging.Level;
 
 /**
- * playground - A Hytale server plugin.
+ * Phonemod - A Hytale server plugin providing an in-game phone device framework.
  *
  * @author esquirtle
  * @version 1.0.0
@@ -31,25 +31,28 @@ public class PhoneMod extends JavaPlugin {
 
     @Override
     protected void setup() {
-        LOGGER.at(Level.INFO).log("[playground] Setting up...");
+        LOGGER.at(Level.INFO).log("[Phonemod] Setting up...");
         this.setupManager = new SetupManager(this);
-        LOGGER.at(Level.INFO).log("[playground] Setup complete!");
+        LOGGER.at(Level.INFO).log("[Phonemod] Setup complete!");
     }
 
     @Override
     protected void start() {
-        LOGGER.at(Level.INFO).log("[playground] Started!");
+        if (setupManager != null) {
+            setupManager.initializeRuntime();
+        }
+        LOGGER.at(Level.INFO).log("[Phonemod] Started!");
         LOGGER.at(Level.INFO).log("=======================================");
-        LOGGER.at(Level.INFO).log("=  ***  Powered by PinaRPG-Core  ***  =");
+        LOGGER.at(Level.INFO).log("=  ***    Powered by Phonemod    ***  =");
         LOGGER.at(Level.INFO).log("=======================================");
     }
 
     @Override
     protected void shutdown() {
-        LOGGER.at(Level.INFO).log("[playground] Shutting down...");
-        LOGGER.at(Level.INFO).log("=======================================");
-        LOGGER.at(Level.INFO).log("=  ***  Powered by PinaRPG-Core  ***  =");
-        LOGGER.at(Level.INFO).log("=======================================");
+        LOGGER.at(Level.INFO).log("[Phonemod] Shutting down...");
+        if (setupManager != null) {
+            setupManager.shutdown();
+        }
         instance = null;
     }
 }

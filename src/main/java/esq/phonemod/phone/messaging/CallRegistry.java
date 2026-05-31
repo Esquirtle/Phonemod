@@ -16,8 +16,13 @@ import esq.phonemod.phone.components.CallRecord;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manages phone call state and performs private voice routing between call parties.
@@ -45,10 +50,80 @@ public final class CallRegistry {
     /** callerNumber → calleeNumber during the ringing phase. */
     private static final ConcurrentHashMap<String, String> pendingCalls = new ConcurrentHashMap<>();
 
+    /** callerNumber → epoch-ms the ring started, for ring-timeout enforcement. */
+    private static final ConcurrentHashMap<String, Long> pendingSince = new ConcurrentHashMap<>();
+
+    /** How long an unanswered outgoing call rings before it is auto-cancelled as missed. */
+    private static final long RING_TIMEOUT_MS = 30_000L;
+
+    /** How often the timeout watcher scans for expired rings. */
+    private static final long TIMEOUT_SCAN_SECONDS = 2L;
+
     /** Radius (in blocks) within which bystanders near the call recipient can hear the phone speaker. */
     private static final double PHONE_SPEAKER_RADIUS = 8.0;
 
+    /** Background watcher that auto-cancels unanswered rings; started by {@link #startTimeoutWatcher()}. */
+    @Nullable
+    private static volatile ScheduledExecutorService timeoutWatcher;
+
     private CallRegistry() {}
+
+    // ── Ring-timeout watcher ────────────────────────────────────────────────────
+
+    /**
+     * Starts the background watcher that auto-cancels rings unanswered after
+     * {@link #RING_TIMEOUT_MS}. Idempotent. Called from the plugin's runtime init.
+     */
+    public static synchronized void startTimeoutWatcher() {
+        if (timeoutWatcher != null) {
+            return;
+        }
+        ScheduledExecutorService exec = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "phonemod-call-timeout");
+            t.setDaemon(true);
+            return t;
+        });
+        exec.scheduleWithFixedDelay(CallRegistry::checkTimeouts,
+                TIMEOUT_SCAN_SECONDS, TIMEOUT_SCAN_SECONDS, TimeUnit.SECONDS);
+        timeoutWatcher = exec;
+    }
+
+    /** Stops the ring-timeout watcher. Idempotent. Called from the plugin's shutdown. */
+    public static synchronized void stopTimeoutWatcher() {
+        ScheduledExecutorService exec = timeoutWatcher;
+        if (exec != null) {
+            exec.shutdownNow();
+            timeoutWatcher = null;
+        }
+    }
+
+    /**
+     * Cancels any pending call that has been ringing longer than {@link #RING_TIMEOUT_MS}.
+     * Runs off the world thread; {@link #hangUp} is thread-safe and marshals UI work onto
+     * the relevant world thread itself.
+     */
+    private static void checkTimeouts() {
+        long now = System.currentTimeMillis();
+        List<String> expired = null;
+        for (Map.Entry<String, Long> entry : pendingSince.entrySet()) {
+            if (now - entry.getValue() >= RING_TIMEOUT_MS) {
+                if (expired == null) expired = new ArrayList<>();
+                expired.add(entry.getKey());
+            }
+        }
+        if (expired == null) {
+            return;
+        }
+        for (String callerNumber : expired) {
+            // Only time out if still pending (not answered/cancelled in the meantime).
+            if (pendingCalls.containsKey(callerNumber)) {
+                LOGGER.atFine().log("[CallRegistry] Ring timed out for %s; cancelling", callerNumber);
+                hangUp(callerNumber);
+            } else {
+                pendingSince.remove(callerNumber);
+            }
+        }
+    }
 
     // ── Voice intercept ───────────────────────────────────────────────────────
 
@@ -166,7 +241,7 @@ public final class CallRegistry {
 
         if (calleeEntry == null) {
             // Callee offline — log missed on callee side when possible, failed on caller side
-            LOGGER.atInfo().log("[CallRegistry] Callee %s offline; call from %s failed", calleeNumber, callerNumber);
+            LOGGER.atFine().log("[CallRegistry] Callee %s offline; call from %s failed", calleeNumber, callerNumber);
             if (callerEntry != null) {
                 callerEntry.world().execute(() -> {
                     persistRecord(callerEntry.store(), callerEntry.ref(), callerNumber,
@@ -178,10 +253,18 @@ public final class CallRegistry {
         }
 
         pendingCalls.put(callerNumber, calleeNumber);
-        LOGGER.atInfo().log("[CallRegistry] Call pending: %s → %s", callerNumber, calleeNumber);
+        pendingSince.put(callerNumber, System.currentTimeMillis());
+        LOGGER.atFine().log("[CallRegistry] Call pending: %s → %s", callerNumber, calleeNumber);
 
+        // Ring the callee.
         calleeEntry.world().execute(() ->
                 calleeEntry.page().onIncomingCall(callerNumber, callerNumber));
+
+        // Show the caller a "Calling…" view while the callee's phone rings.
+        if (callerEntry != null) {
+            callerEntry.world().execute(() ->
+                    callerEntry.page().onOutgoingCall(calleeNumber, calleeName));
+        }
     }
 
     /**
@@ -195,9 +278,10 @@ public final class CallRegistry {
             return;
         }
         pendingCalls.remove(callerNumber);
+        pendingSince.remove(callerNumber);
         activeCalls.put(callerNumber, calleeNumber);
         activeCalls.put(calleeNumber, callerNumber);
-        LOGGER.atInfo().log("[CallRegistry] Call connected: %s ↔ %s", callerNumber, calleeNumber);
+        LOGGER.atFine().log("[CallRegistry] Call connected: %s ↔ %s", callerNumber, calleeNumber);
 
         PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
         PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(calleeNumber);
@@ -218,7 +302,7 @@ public final class CallRegistry {
         String partnerNumber = activeCalls.remove(number);
         if (partnerNumber != null) {
             activeCalls.remove(partnerNumber);
-            LOGGER.atInfo().log("[CallRegistry] Call ended: %s ↔ %s", number, partnerNumber);
+            LOGGER.atFine().log("[CallRegistry] Call ended: %s ↔ %s", number, partnerNumber);
             long ts = System.currentTimeMillis();
 
             PhoneRegistry.OnlineEntry myEntry      = PhoneRegistry.getOnlineEntry(number);
@@ -247,7 +331,8 @@ public final class CallRegistry {
         String callerNumber = getCallerFor(number);
         if (callerNumber != null) {
             pendingCalls.remove(callerNumber);
-            LOGGER.atInfo().log("[CallRegistry] Call declined (%s → %s)", callerNumber, number);
+            pendingSince.remove(callerNumber);
+            LOGGER.atFine().log("[CallRegistry] Call declined (%s → %s)", callerNumber, number);
             long ts = System.currentTimeMillis();
 
             PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
@@ -266,13 +351,32 @@ public final class CallRegistry {
             return;
         }
 
-        // Cancel pending call (caller hanging up before answer)
+        // Cancel pending call (caller hanging up before answer, or ring timeout)
         String calleeNumber = pendingCalls.remove(number);
+        pendingSince.remove(number);
         if (calleeNumber != null) {
-            LOGGER.atInfo().log("[CallRegistry] Call cancelled by caller (%s → %s)", number, calleeNumber);
+            LOGGER.atFine().log("[CallRegistry] Call cancelled by caller (%s → %s)", number, calleeNumber);
+            long ts = System.currentTimeMillis();
+
+            // Record the cancelled outgoing attempt on the caller's history.
+            PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(number);
+            if (callerEntry != null) {
+                final String cNum = calleeNumber;
+                callerEntry.world().execute(() -> {
+                    persistRecord(callerEntry.store(), callerEntry.ref(), number,
+                            new CallRecord(cNum, cNum, ts, true, true));
+                    callerEntry.page().onCallEnded();
+                });
+            }
+            // Record a missed incoming call on the callee's history and clear their ring UI.
             PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(calleeNumber);
             if (calleeEntry != null) {
-                calleeEntry.world().execute(() -> calleeEntry.page().onCallEnded());
+                final String n = number;
+                calleeEntry.world().execute(() -> {
+                    persistRecord(calleeEntry.store(), calleeEntry.ref(), calleeNumber,
+                            new CallRecord(n, n, ts, false, true));
+                    calleeEntry.page().onCallEnded();
+                });
             }
         }
     }

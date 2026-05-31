@@ -1,112 +1,73 @@
 package esq.phonemod.phone.apps.helpers;
 
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.ui.builder.EventData;
-import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
-import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import esq.phonemod.phone.components.ConversationHistoryComponent;
-import esq.phonemod.phone.messaging.ChatMessage;
-import esq.phonemod.phone.messaging.PhoneRegistry;
-import esq.phonemod.phone.messaging.TextMessage;
-
-import javax.annotation.Nonnull;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-/** Static helpers that build Whatgram UI state — conversation list and chat view. */
+/**
+ * Selector and asset-path constants for the Whatgram UI.
+ *
+ * <p>Pure constants, referenced by {@link esq.phonemod.phone.apps.WhatgramApp}
+ * so every Whatgram selector string lives in exactly one place.
+ *
+ * <p>Whatgram uses a <em>single-root</em> layout ({@code DustWhatgram.ui}): the
+ * same document owns both the conversation-list view and the chat view. The app
+ * switches between them by toggling child visibility and re-filling
+ * {@link #SEL_CONTENT_LIST} — it never replaces the shell content area. None of
+ * these selectors is the shell content area; apps get that from
+ * {@code PhoneAppContext.getContentSelector()}.
+ */
 public final class Whatgram {
-
-    static final String WHATGRAM_UI        = "Pages/Phone/Whatgram.ui";
-    static final String ENTRY_UI           = "Pages/Phone/Components/WhatgramChatEntry.ui";
-    static final String WHATCHAT_UI        = "Pages/Phone/Components/WhatgramChat.ui";
-    static final String BUBBLE_UI          = "Pages/Phone/Components/WhatgramMessageBubble.ui";
-    static final String BUBBLE_COLOR_SENT  = "#43D69A";
-    static final String BUBBLE_COLOR_RECV  = "#99ae5e";
-
-    private static final String CONTENT = "#AppContent";
 
     private Whatgram() {}
 
-    /**
-     * Clears {@code #AppContent} and populates the Whatgram conversation list.
-     * Merges persistent history contacts with the session inbox so every known
-     * conversation appears even when no message arrived this session.
-     */
-    public static void loadConversationList(@Nonnull String phoneNumber,
-                                             @Nonnull Store<EntityStore> store,
-                                             @Nonnull Ref<EntityStore> ref,
-                                             @Nonnull UICommandBuilder cmd,
-                                             @Nonnull UIEventBuilder evb) {
-        cmd.clear(CONTENT);
-        cmd.append(CONTENT, WHATGRAM_UI);
+    // ── UI file paths ─────────────────────────────────────────────────────────
 
-        LinkedHashMap<String, String> uniqueSenders = new LinkedHashMap<>();
+    /** One conversation-list row. */
+    public static final String ENTRY_UI  = "Pages/Phone/Components/DustWhatgramConvEntry.ui";
+    /** One chat message bubble. */
+    public static final String BUBBLE_UI = "Pages/Phone/Components/DustWhatgramBubble.ui";
 
-        ConversationHistoryComponent history =
-                store.ensureAndGetComponent(ref, ConversationHistoryComponent.getComponentType());
-        for (String contact : history.getContacts(phoneNumber)) {
-            uniqueSenders.putIfAbsent(contact, contact);
-        }
+    // ── Bubble colours (Dust palette) ─────────────────────────────────────────
 
-        for (TextMessage msg : PhoneRegistry.getInbox(phoneNumber)) {
-            uniqueSenders.put(msg.fromNumber(), msg.fromName());
-        }
+    public static final String BUBBLE_COLOR_SENT = "#2f5d44";
+    public static final String BUBBLE_COLOR_RECV = "#26303f";
 
-        int i = 0;
-        for (Map.Entry<String, String> sender : uniqueSenders.entrySet()) {
-            String fromNumber = sender.getKey();
-            String fromName   = sender.getValue();
-            cmd.append("#WhatgramContent", ENTRY_UI);
-            cmd.set("#WhatgramContent[" + i + "] #Name.Text", fromName + " (" + fromNumber + ")");
-            evb.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    "#WhatgramContent[" + i + "] #Button",
-                    EventData.of("Action", "open_chat").append("Contact", fromNumber),
-                    false);
-            i++;
-        }
-    }
+    // ── Header (shared by both views) ─────────────────────────────────────────
 
-    /**
-     * Clears {@code #AppContent} and renders the chat view for the given conversation.
-     * Populates message bubbles from persistent history and binds the send button.
-     */
-    public static void loadChat(@Nonnull String phoneNumber,
-                                 @Nonnull String contactNumber,
-                                 @Nonnull Store<EntityStore> store,
-                                 @Nonnull Ref<EntityStore> ref,
-                                 @Nonnull UICommandBuilder cmd,
-                                 @Nonnull UIEventBuilder evb) {
-        cmd.clear(CONTENT);
-        cmd.append(CONTENT, WHATCHAT_UI);
-        cmd.set("#ContactTopbar #ContactName.Text", contactNumber);
+    /** Title label; shows "Whatgram" in the list view, the contact in chat. */
+    public static final String SEL_HEADER_TITLE_TEXT = "#WhatgramHeader #HeaderTitle.Text";
+    /** Back button (@DustAppBar leading) — visible only in the chat view. */
+    public static final String SEL_HEADER_BACK_BUTTON = "#WhatgramHeader #BackButton";
+    /** Trailing action button (@DustAppBar, labelled "Call") — chat view only. */
+    public static final String SEL_HEADER_ACTION_BUTTON = "#WhatgramHeader #ActionButton";
 
-        ConversationHistoryComponent history =
-                store.ensureAndGetComponent(ref, ConversationHistoryComponent.getComponentType());
-        List<ChatMessage> messages = history.getMessages(phoneNumber, contactNumber);
-        int i = 0;
-        for (ChatMessage msg : messages) {
-            cmd.append("#MessageList", BUBBLE_UI);
-            cmd.set("#MessageList[" + i + "] #Sender.Text", msg.fromName());
-            cmd.set("#MessageList[" + i + "] #Body.Text", msg.body());
-            cmd.set("#MessageList[" + i + "].Background",
-                    msg.fromMe() ? BUBBLE_COLOR_SENT : BUBBLE_COLOR_RECV);
-            i++;
-        }
+    // ── Themeable root surfaces (one source of truth; see getThemeableSelectors) ─
 
-        evb.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#SendButton",
-                EventData.of("Action", "send_message").append("@MessageValue", "#MessageInput.Value"),
-                false);
-        evb.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#ContactTopbar #CallButton",
-                EventData.of("Action", "start_call").append("Contact", contactNumber),
-                false);
-    }
+    /** Themeable header surface (role: appHeader). */
+    public static final String SEL_HEADER = "#WhatgramHeader";
+    /** Themeable panel surface (role: appPanel). */
+    public static final String SEL_PANEL  = "#WhatgramPanel";
+
+    // ── Panel content ─────────────────────────────────────────────────────────
+
+    /** Scrolling list that holds conversation rows OR message bubbles. Themeable (role: appContent). */
+    public static final String SEL_CONTENT_LIST = "#WhatgramContent";
+
+    // Conversation-row children (relative to an appended ENTRY_UI row).
+    /** Relative: name label inside a conversation row. */
+    public static final String SEL_ENTRY_NAME_TEXT = "#Name.Text";
+    /** Relative: open-chat button inside a conversation row. */
+    public static final String SEL_ENTRY_BUTTON    = "#Button";
+
+    // Bubble children (relative to an appended BUBBLE_UI row).
+    /** Relative: sender label inside a message bubble. */
+    public static final String SEL_BUBBLE_SENDER_TEXT = "#Sender.Text";
+    /** Relative: body label inside a message bubble. */
+    public static final String SEL_BUBBLE_BODY_TEXT   = "#Body.Text";
+
+    // ── Composer (chat view only) ─────────────────────────────────────────────
+
+    // The composer is a @DustShellMessageInput instance: children #DustSendButton
+    // and #DustMessageInput.
+    /** The composer row; hidden in the list view, shown in chat. */
+    public static final String SEL_COMPOSER          = "#WhatgramComposer";
+    public static final String SEL_SEND_BUTTON       = "#WhatgramComposer #DustSendButton";
+    public static final String SEL_MESSAGE_INPUT_VALUE = "#WhatgramComposer #DustMessageInput.Value";
 }

@@ -37,9 +37,9 @@ public final class MyCustomPhoneApp extends StatefulPhoneApp<MyCustomPhoneApp.St
 
     @Override
     public void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
-        appendMainUI(cmd);
+        appendMainUI(ctx, cmd);
         if (getState(ctx) == State.DETAILS) {
-            cmd.append(CONTENT_SELECTOR, "Pages/Phone/Components/MyDetails.ui");
+            cmd.append(ctx.getContentSelector(), "Pages/Phone/Components/MyDetails.ui");
             evb.addEventBinding(CustomUIEventBindingType.Activating,
                     "#BackButton", EventData.of("Action", PhoneEventActions.BACK), false);
         } else {
@@ -70,7 +70,7 @@ public final class MyCustomPhoneApp extends StatefulPhoneApp<MyCustomPhoneApp.St
 
 ### Key points
 
-- Always call `appendMainUI(cmd)` at the top of `build()`. It clears `#AppContent` and loads `getUIPath()`.
+- Always call `appendMainUI(ctx, cmd)` at the top of `build()`. It clears the shell content area (`ctx.getContentSelector()`) and loads `getUIPath()`.
 - Return `true` from `handleEvent` if you handled the event (the framework sends your builders as the update). Return `false` if you did not (the framework sends a no-op).
 - After mutating state in `handleEvent`, call `build()` with the same builders to produce the updated UI in the same response.
 
@@ -260,13 +260,13 @@ public final class NotesApp extends StatefulPhoneApp<NotesApp.State> {
 
     @Override
     public void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
-        appendMainUI(cmd);
+        appendMainUI(ctx, cmd);
         if (getState(ctx) == State.EDIT) {
-            cmd.append(CONTENT_SELECTOR, "Pages/Phone/Components/NotesEdit.ui");
+            cmd.append(ctx.getContentSelector(), "Pages/Phone/Components/NotesEdit.ui");
             evb.addEventBinding(CustomUIEventBindingType.Activating,
                     "#BackButton", EventData.of("Action", PhoneEventActions.BACK), false);
         } else {
-            cmd.append(CONTENT_SELECTOR, "Pages/Phone/Components/NotesList.ui");
+            cmd.append(ctx.getContentSelector(), "Pages/Phone/Components/NotesList.ui");
             evb.addEventBinding(CustomUIEventBindingType.Activating,
                     "#OpenNoteButton", EventData.of("Action", "open_note"), false);
         }

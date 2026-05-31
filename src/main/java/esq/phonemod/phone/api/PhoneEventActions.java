@@ -3,17 +3,21 @@ package esq.phonemod.phone.api;
 /**
  * String constants for all action values used in phone UI event bindings.
  *
- * <p>Use these in {@link PhoneApp#handleEvent} switch/if blocks and in
+ * <p>
+ * Use these in {@link PhoneApp#handleEvent} switch/if blocks and in
  * {@code EventData.of("Action", PhoneEventActions.X)} bindings to avoid
  * magic strings and typos across plugins.
  */
 public final class PhoneEventActions {
 
-    private PhoneEventActions() {}
+    private PhoneEventActions() {
+    }
 
-    // ── Phone-level — handled by PhonePage before reaching any app ────────────
+    // ── Phone-level — handled by DevicePage before reaching any app ───────────
 
-    /** Return to the home screen (app menu). Fired by the bottom-bar home button. */
+    /**
+     * Return to the home screen (app menu). Fired by the bottom-bar home button.
+     */
     public static final String HOME = "home";
 
     /**
@@ -52,7 +56,8 @@ public final class PhoneEventActions {
     /**
      * Initiate a phone call.
      * Payload key: {@code Contact} → target phone number, or
-     * {@code DialNumber} (captured via {@code @DialNumber} from {@code #DialInput.Value}).
+     * {@code DialNumber} (captured via {@code @DialNumber} from
+     * {@code #DialInput.Value}).
      */
     public static final String START_CALL = "start_call";
 
@@ -66,7 +71,8 @@ public final class PhoneEventActions {
 
     /**
      * Save a new contact from the add-contact form.
-     * Payload keys: {@code ContactFormNumber}, {@code ContactFormName} (both captured
+     * Payload keys: {@code ContactFormNumber}, {@code ContactFormName} (both
+     * captured
      * via the {@code @} prefix from their respective input fields).
      */
     public static final String SAVE_CONTACT = "save_contact";

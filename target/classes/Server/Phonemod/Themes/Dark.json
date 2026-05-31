@@ -1,0 +1,10 @@
+{
+  "DisplayNameKey": "phonemod.theme.dark",
+  "Colors": {
+    "topbar": "#162032",
+    "bottombar": "#121b28",
+    "appHeader": "#162032",
+    "appPanel": "#0f1724",
+    "appContent": "#111926"
+  }
+}

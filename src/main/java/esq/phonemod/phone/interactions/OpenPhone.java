@@ -1,5 +1,6 @@
 package esq.phonemod.phone.interactions;
 
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -12,22 +13,25 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Sim
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import esq.phonemod.device.core.DeviceService;
+import esq.phonemod.device.core.DeviceSession;
+import esq.phonemod.device.core.DeviceShell;
+import esq.phonemod.device.ui.DevicePage;
 import esq.phonemod.phone.components.PhoneOwnerComponent;
-import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.PhoneRegistry;
-import esq.phonemod.phone.ui.PhonePage;
-import org.bson.BsonDocument;
 import org.bson.BsonString;
 
 import javax.annotation.Nonnull;
 import java.util.Random;
 
 /**
- * Interaction that opens the {@link PhonePage} for the activating player.
+ * Interaction that opens the phone device page for the activating player.
  * Register in setup with key {@code "open_phone"}.
  *
- * <p>Phone numbers are stored in the item's metadata under the key
- * {@code "PhoneNumber"} so each physical phone item has its own unique number.
+ * <p>The device shell and metadata key are read from the {@code Phone} device
+ * asset so no constants are hard-coded here. Physical phone item metadata uses
+ * the key specified by {@link DeviceShell#getMetadataKey()} (default
+ * {@code "PhoneNumber"}).
  *
  * <p>Link to an item's {@code Interactions} block in its JSON definition:
  * <pre>{@code
@@ -39,7 +43,6 @@ import java.util.Random;
 public final class OpenPhone extends SimpleInstantInteraction {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    private static final String PHONE_NUMBER_KEY = "PhoneNumber";
     private static final Random RANDOM = new Random();
 
     public static final BuilderCodec<OpenPhone> CODEC = BuilderCodec
@@ -55,47 +58,55 @@ public final class OpenPhone extends SimpleInstantInteraction {
 
         PlayerRef playerRef = commandBuffer.getComponent(ref, PlayerRef.getComponentType());
         if (playerRef == null) {
-            LOGGER.atWarning().log("[OpenPhone] PlayerRef is null — cannot open phone page");
+            LOGGER.atWarning().log("[OpenPhone] PlayerRef is null — cannot open device page");
             return;
         }
 
         Player player = commandBuffer.getComponent(ref, Player.getComponentType());
         if (player == null) {
-            LOGGER.atWarning().log("[OpenPhone] Player component is null — cannot open phone page");
+            LOGGER.atWarning().log("[OpenPhone] Player component is null — cannot open device page");
             return;
         }
 
-        // Read the phone number from item metadata during tick (read-safe)
         ItemStack heldItem = context.getHeldItem();
         if (heldItem == null) {
-            LOGGER.atWarning().log("[OpenPhone] No held item — cannot open phone page");
+            LOGGER.atWarning().log("[OpenPhone] No held item — cannot open device page");
             return;
         }
 
-        BsonDocument metadata = heldItem.getMetadata();
-        final String phoneNumber;
-
-        if (metadata != null && metadata.containsKey(PHONE_NUMBER_KEY)) {
-            phoneNumber = metadata.getString(PHONE_NUMBER_KEY).getValue();
-        } else {
-            // Generate a new number and write it into the inventory slot
-            phoneNumber = generatePhoneNumber();
-            BsonDocument newMeta = metadata != null ? metadata.clone() : new BsonDocument();
-            newMeta.put(PHONE_NUMBER_KEY, new BsonString(phoneNumber));
-            ItemStack stamped = new ItemStack(heldItem.getItemId(), heldItem.getQuantity(), newMeta);
-            context.getHeldItemContainer().setItemStackForSlot(context.getHeldItemSlot(), stamped);
-            context.setHeldItem(stamped);
-            LOGGER.atInfo().log("[OpenPhone] Assigned new phone number %s to item", phoneNumber);
+        // Resolve the device shell for the default phone asset. This gives us the
+        // metadata key without hard-coding "PhoneNumber" in this class.
+        DeviceShell shell;
+        try {
+            shell = DeviceService.get().createShell(DeviceService.DEFAULT_PHONE_ASSET_ID);
+        } catch (IllegalArgumentException e) {
+            LOGGER.atWarning().withCause(e).log("[OpenPhone] Default phone device asset not available; falling back");
+            return;
         }
 
-        // Register the phone number in the registry so messages can be delivered
-        // and the disconnect listener can clean it up. Safe on the tick thread (ConcurrentHashMap).
-        // The PhonePage is created here so its reference can be stored in the registry
-        // for live push updates before the page is opened on the world thread.
+        String metadataKey = shell.getMetadataKey();
+        String existingId = heldItem.getFromMetadataOrNull(metadataKey, Codec.STRING);
+        final String deviceId;
+
+        if (existingId != null) {
+            deviceId = existingId;
+        } else {
+            // Generate a new device ID and stamp it into the item metadata.
+            deviceId = generatePhoneNumber();
+            ItemStack stamped = heldItem.withMetadata(metadataKey, new BsonString(deviceId));
+            context.getHeldItemContainer().setItemStackForSlot(context.getHeldItemSlot(), stamped);
+            context.setHeldItem(stamped);
+            LOGGER.atFine().log("[OpenPhone] Assigned new device ID %s to item (key=%s)", deviceId, metadataKey);
+        }
+
+        // Build the session and page on the tick thread so the page reference is
+        // ready before PhoneRegistry.register stores it for live push callbacks.
         var store = commandBuffer.getStore();
-        PhonePage phonePage = PhoneService.get().createPhonePage(playerRef, phoneNumber);
+        DeviceSession session = DeviceService.get().createSession(
+                playerRef, ref, store, DeviceService.DEFAULT_PHONE_ASSET_ID, deviceId);
+        DevicePage devicePage = DeviceService.get().createDevicePage(session);
         World world = player.getWorld();
-        PhoneRegistry.register(phoneNumber, ref, playerRef, store, world, phonePage);
+        PhoneRegistry.register(deviceId, ref, playerRef, store, world, devicePage);
 
         final boolean needsComponent = store.getComponent(ref, PhoneOwnerComponent.getComponentType()) == null;
 
@@ -106,18 +117,18 @@ public final class OpenPhone extends SimpleInstantInteraction {
             player.getPageManager().openCustomPage(
                     playerRef.getReference(),
                     store,
-                    phonePage);
+                    devicePage);
         });
     }
 
-    /** Generates a number in the format {@code XXX-XXXX}. */
+    /** Generates a device ID in the format {@code XXX-XXXX}. */
     private static String generatePhoneNumber() {
-        String phoneNumber;
+        String id;
         do {
             int prefix = 100 + RANDOM.nextInt(900);
             int suffix = RANDOM.nextInt(10_000);
-            phoneNumber = String.format("%03d-%04d", prefix, suffix);
-        } while (PhoneRegistry.getOnlineEntry(phoneNumber) != null);
-        return phoneNumber;
+            id = String.format("%03d-%04d", prefix, suffix);
+        } while (PhoneRegistry.getOnlineEntry(id) != null);
+        return id;
     }
 }

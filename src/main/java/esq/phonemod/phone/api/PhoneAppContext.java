@@ -15,13 +15,16 @@ import javax.annotation.Nullable;
 /**
  * Context provided to phone apps for the current session.
  *
- * <p>Each app method receives a context scoped to the specific player and app.
+ * <p>
+ * Each app method receives a context scoped to the specific player and app.
  * Per-player state is stored in the {@link PhoneAppSessionState} component and
  * accessed via {@link #getState}/{@link #setState}. All state values are
  * {@code String}; use {@link Boolean#parseBoolean}, {@link Integer#parseInt},
  * or {@code Enum.valueOf} for typed reads.
  *
- * <p>Example:
+ * <p>
+ * Example:
+ * 
  * <pre>{@code
  * boolean expanded = Boolean.parseBoolean(ctx.getState("expanded", "false"));
  * int page = Integer.parseInt(ctx.getState("page", "0"));
@@ -37,17 +40,20 @@ public final class PhoneAppContext {
     private final PlayerRef playerRef;
     private final String phoneNumber;
     private final String appId;
+    private final String contentSelector;
 
     public PhoneAppContext(@Nonnull Ref<EntityStore> ref,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull String phoneNumber,
-                           @Nonnull String appId) {
+            @Nonnull Store<EntityStore> store,
+            @Nonnull PlayerRef playerRef,
+            @Nonnull String phoneNumber,
+            @Nonnull String appId,
+            @Nonnull String contentSelector) {
         this.ref = ref;
         this.store = store;
         this.playerRef = playerRef;
         this.phoneNumber = phoneNumber;
         this.appId = appId;
+        this.contentSelector = contentSelector;
     }
 
     // ── Identity ──────────────────────────────────────────────────────────────
@@ -78,6 +84,17 @@ public final class PhoneAppContext {
         return appId;
     }
 
+    /**
+     * Returns the device shell's content-area selector (e.g. {@code "#AppContent"}),
+     * sourced from the device asset. This is the region an app's root UI is loaded
+     * into. Apps should target this only to replace their whole view; to update a
+     * list or sub-region, use the app's own named selectors instead.
+     */
+    @Nonnull
+    public String getContentSelector() {
+        return contentSelector;
+    }
+
     private String getSessionKey() {
         String sessionKey = phoneNumber + "|" + appId;
         LOGGER.atInfo().log("[PhoneAppContext] sessionKey=%s phone=%s app=%s", sessionKey, phoneNumber, appId);
@@ -94,7 +111,8 @@ public final class PhoneAppContext {
     public String getState(@Nonnull String key) {
         PhoneAppSessionState s = store.ensureAndGetComponent(ref, PhoneAppSessionState.getComponentType());
         String value = s.get(getSessionKey(), key);
-        LOGGER.atInfo().log("[PhoneAppContext] getState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key, value);
+        LOGGER.atInfo().log("[PhoneAppContext] getState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key,
+                value);
         return value;
     }
 
@@ -114,7 +132,8 @@ public final class PhoneAppContext {
      */
     public void setState(@Nonnull String key, @Nonnull String value) {
         PhoneAppSessionState s = store.ensureAndGetComponent(ref, PhoneAppSessionState.getComponentType());
-        LOGGER.atInfo().log("[PhoneAppContext] setState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key, value);
+        LOGGER.atInfo().log("[PhoneAppContext] setState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key,
+                value);
         s.set(getSessionKey(), key, value);
         store.putComponent(ref, PhoneAppSessionState.getComponentType(), s);
     }

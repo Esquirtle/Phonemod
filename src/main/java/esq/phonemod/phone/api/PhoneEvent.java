@@ -16,8 +16,8 @@ public final class PhoneEvent {
     private final Map<String, String> params;
 
     public PhoneEvent(@Nonnull String action,
-                      @Nonnull String appId,
-                      Map<String, String> params) {
+            @Nonnull String appId,
+            Map<String, String> params) {
         this.action = action;
         this.appId = appId;
         this.params = Collections.unmodifiableMap(new HashMap<>(params));

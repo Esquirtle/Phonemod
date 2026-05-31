@@ -1,0 +1,10 @@
+{
+  "DisplayNameKey": "phonemod.theme.compact",
+  "Colors": {
+    "topbar": "#2a3548",
+    "bottombar": "#222c3c",
+    "appHeader": "#2a3548",
+    "appPanel": "#28323f",
+    "appContent": "#2b3645"
+  }
+}

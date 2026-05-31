@@ -1,75 +1,78 @@
 # Architecture
 
+Phonemod is a generic, server-side **device framework**. The phone is the
+reference device; tablets/terminals are just different device assets. Runtime
+shell + routing live in the `device` packages; the app contract lives in
+`phone.api` (kept stable for app authors).
+
 ## Class roles
 
 | Class | Package | Role |
-|-------|---------|------|
-| `PhonePage` | `phone.ui` | Full-screen routing hub. Translates raw codec events into `PhoneEvent` and dispatches to the active app. |
-| `PhoneService` | `phone.core` | Singleton. Manages registered apps and creates `PhonePage` instances. |
-| `PhoneAppRegistry` | `phone.core` | Ordered catalog of registered apps. Throws on duplicate IDs. |
-| `PhoneApp<S>` | `phone.api` | Interface every app must implement. |
-| `StatefulPhoneApp<S>` | `phone.api` | Abstract base class that adds enum-backed per-player state helpers on top of `PhoneApp`. |
-| `PhoneAppContext` | `phone.api` | Per-player session context passed to every app method. Provides ECS access, player identity, and scoped state storage. |
-| `PhoneEvent` | `phone.api` | Normalized, immutable event payload created by `PhonePage` from the raw codec event. |
-| `PhoneEventActions` | `phone.api` | String constants for every known action name. |
-| `PhoneAssetPaths` | `phone.api` | String constants for every UI and icon asset path. |
-| `AppMenu` | `phone.ui` | Static builder. Renders the home-screen app grid by iterating `PhoneService.get().getApps()`. |
-| `PhoneStatesEnum` | `phone.ui` | Enum tracking the phone's top-level navigation state (`HOME`, `APP`, `CALLS`, `INCOMING_CALL`, `ACTIVE_CALL`). |
-| `PhoneAppSessionState` | `phone.components` | ECS component on the player entity. Stores `Map<phoneNumber|appId, Map<key, value>>` so each physical phone's apps have an isolated key space. |
+|---|---|---|
+| `DeviceAsset` | `device.assets` | Immutable JSON device blueprint (`Server/Phonemod/Devices/*.json`): shell UI path, selectors, capabilities, default apps, theme. |
+| `DeviceService` | `device.core` | Singleton. Resolves device assets, builds `DeviceShell`/`DeviceSession`, creates `DevicePage`. |
+| `DeviceShell` | `device.core` | Immutable runtime descriptor from a `DeviceAsset`: content/home/home-button selectors, capability gates, sound profile, themeable selectors. |
+| `DeviceSession` | `device.core` | Runtime-only per-open-device state: current app, `DevicePageState`, page handle, refs. Never serialized. |
+| `DevicePage` | `device.ui` | The custom UI page. Translates raw codec events into `PhoneEvent`, handles shell-level actions, dispatches the rest to the active app, and drives theme + call overlays. |
+| `DevicePageState` | `device.core` | Enum: `HOME`, `APP`, `CALLS`, `INCOMING_CALL`, `ACTIVE_CALL`. |
+| `PhoneService` | `phone.core` | Singleton. Manages registered apps (`registerApp` / `getApp` / `getApps`). |
+| `PhoneApp<S>` / `StatefulPhoneApp<S>` | `phone.api` | The app contract; `StatefulPhoneApp` adds enum-backed per-player state. |
+| `PhoneAppContext` | `phone.api` | Per-player session context passed to every app method: ECS access, identity, scoped state, and the shell content selector. |
+| `PhoneEvent` / `PhoneEventActions` | `phone.api` | Normalized event payload + action-name constants. |
+| `PhoneUi` / `PhoneAssetPaths` | `phone.api` | UI-builder helpers + asset-path constants. |
+| `PhoneAppSessionState` | `phone.components` | ECS component on the player: `Map<deviceId\|appId, Map<key,value>>` — isolated per device + app. |
 
-## Class relationship diagram
+## Relationship diagram
 
 ```
-PhoneService (singleton)
-  └─ PhoneAppRegistry
-       └─ List<PhoneApp<?>>
-            ├─ WhatgramApp  (StatefulPhoneApp<State>)
-            ├─ ContactsApp  (StatefulPhoneApp<State>)
-            ├─ CallsApp     (StatefulPhoneApp<State>)
-            ├─ SettingsApp  (StatefulPhoneApp<State>)
-            └─ [third-party apps...]
-
-PhonePage  (one instance per open phone, created by PhoneService)
-  ├─ currentApp: PhoneApp<?>
-  ├─ currentState: PhoneStatesEnum
-  ├─ phoneNumber: String
-  └─ build() / handleDataEvent()
-       └─ PhoneAppContext  (created on-demand per call)
-            └─ PhoneAppSessionState (ECS component on player entity)
+DeviceService (singleton)              PhoneService (singleton)
+  ├─ DeviceRegistry (shell cache)        └─ PhoneAppRegistry → List<PhoneApp<?>>
+  └─ creates ↓                                WhatgramApp / ContactsApp /
+DeviceSession (one per open device)           CallsApp / SettingsApp / [3rd-party]
+  ├─ shell: DeviceShell
+  ├─ currentApp / currentState: DevicePageState
+  └─ page: DevicePage
+        └─ build() / handleDataEvent()
+             └─ PhoneAppContext (per call) → PhoneAppSessionState (ECS)
 ```
 
 ## Data flow — user button press
 
 ```
 Player clicks UI button
-  → CustomUIEvent fires (raw codec event)
-  → PhonePage.handleDataEvent(ref, store, PhoneEventData)
-      ├─ Phone-level action? (home / open_app / answer_call / ...)
-      │    └─ Handled directly; sendUpdate() rebuilds UI
-      └─ App-level action?
-           ├─ PhoneAppContext created for currentApp
-           ├─ PhoneEvent built from PhoneEventData
+  → CustomUIEvent (raw codec) → DevicePage.handleDataEvent()
+      ├─ Shell action (home / open_app / answer_call / hang_up / ...)?
+      │    └─ handled directly; sendUpdate() refreshes UI
+      └─ App action?
+           ├─ PhoneAppContext created for the current app
+           ├─ PhoneEvent built (unknown keys preserved in getParams())
            ├─ currentApp.handleEvent(ctx, event, cmd, evb)
-           └─ sendUpdate(cmd, evb, false) pushed to client
+           └─ sendUpdate(cmd, evb) pushed to client
 ```
 
 ## Data flow — server-side push (incoming call / message)
 
 ```
-CallRegistry / PhoneRegistry detects event
-  → PhonePage.onIncomingCall() / onIncomingMessage() / ...
-      ├─ Optionally delegates to currentApp hook
-      └─ sendUpdate() pushed to client without any player interaction
+CallRegistry / messaging detects event
+  → the live DevicePage (via DevicePageHandle) onIncomingCall() / onIncomingMessage()
+      ├─ optionally delegates to the current app's hook
+      └─ sendUpdate() pushed to client (no player interaction)
 ```
+
+Registries store the `DevicePageHandle` interface, not a concrete page type.
 
 ## Design decisions
 
-**App instances are singletons.** `PhoneService` holds exactly one instance of each registered app. This means all players share the same app object. Per-player data must never be stored as instance fields — use `PhoneAppContext` state instead.
+**App instances are singletons.** `PhoneService` holds one instance of each app, shared by all players. Per-player data must live in `PhoneAppContext` state, never instance fields.
 
-**`PhonePage` owns phone-level routing.** Actions like `home`, `open_app`, `answer_call`, `decline_call`, and `hang_up` are intercepted and handled by `PhonePage.handleDataEvent()` before any app ever sees them. Apps only receive actions that fall through.
+**`DevicePage` owns shell-level routing.** `home`, `open_app`, `answer_call`, `decline_call`, `hang_up` are intercepted in `DevicePage.handleDataEvent()` before any app sees them. Apps only receive actions that fall through.
 
-**`PhoneStatesEnum` is phone-level only.** It tracks whether the phone is showing the home screen, an app, a call screen, etc. App-internal navigation (e.g. "which chat is open") is not represented here — it lives in `ctx.getState()`.
+**Shell selectors come from the device asset.** Content / home / home-button / topbar / bottombar selectors are declared in `Phone.json` and read via `DeviceShell` — never hardcoded. The matching element IDs are provided by DustLib shell components (`@DustStatusBar`, `@DustHomeBar`, …).
 
-**`open_chat` has special routing.** If `currentAppId` is not `"whatgram"`, `PhonePage` first opens the Whatgram app, then immediately forwards the `open_chat` event to it so the correct conversation is rendered in a single round-trip.
+**`DevicePageState` is shell-level only.** Home vs app vs call screen. App-internal navigation (e.g. which chat is open) lives in `ctx.getState()`.
 
-**Call state is restored on phone open.** `PhonePage.build()` checks `CallRegistry` for an active call, pending outgoing call, or pending incoming call before deciding whether to render the home screen. This ensures the correct UI is shown if the player reopens the phone mid-call.
+**`open_chat` has special routing.** If the current app is not `whatgram`, `DevicePage` opens Whatgram first, then forwards `open_chat` so the conversation renders in one round-trip.
+
+**Call state is restored on open.** `DevicePage.build()` checks `CallRegistry` for an active/pending call before rendering home, so reopening mid-call shows the right screen. Call overlays are gated by the device's `calls` capability.
+
+**The status bar is persistent.** `#TopBar` sits above `#AppContent`, so it survives apps and Home navigation clearing the content area.

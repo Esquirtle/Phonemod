@@ -1,22 +1,22 @@
-# Phone Navigation
+# Device Navigation
 
-## PhoneStatesEnum
+## DevicePageState
 
-`esq.phonemod.phone.ui.PhoneStatesEnum`
+`esq.phonemod.device.core.DevicePageState`
 
-Tracks the phone's top-level navigation state. This is a `PhonePage`-internal enum — it is not exposed to apps. App-internal navigation states (e.g. "which chat is open") live in `PhoneAppContext` per-player state via `ctx.getState()`.
+Tracks the device's top-level navigation state. This is `DevicePage`-internal — it is not exposed to apps. App-internal navigation states (e.g. "which chat is open") live in `PhoneAppContext` per-player state via `ctx.getState()`.
 
 | Value | When set | UI shown |
 |-------|----------|----------|
-| `HOME` | `loadHomeState()` called; `home` action received | App launcher grid (`AppMenu.ui`) |
+| `HOME` | `loadHomeState()` / `home` action | App grid (built into `#APPHolder`) |
 | `APP` | `openApp()` called | The active app's UI (loaded into `#AppContent`) |
 | `CALLS` | `onCallEnded()` when no app was active before the call | Calls screen (dialer + history) |
-| `INCOMING_CALL` | `onIncomingCall()` when no app was active; or call-state restore on open | Incoming call prompt (`IncomingCall.ui`) |
-| `ACTIVE_CALL` | `onCallAnswered()`; or call-state restore on open | Active call screen (`ActiveCall.ui`) |
+| `INCOMING_CALL` | `onIncomingCall()` with no active app; or call-state restore on open | Incoming-call overlay (`DustIncomingCall.ui`) |
+| `ACTIVE_CALL` | `onCallAnswered()`; or call-state restore on open | Active-call overlay (`DustActiveCall.ui`) |
 
-## PhonePage — routing hub
+## DevicePage — routing hub
 
-`PhonePage` is the single routing hub for the phone UI. One instance is created per player per phone open (via `PhoneService.createPhonePage()`).
+`DevicePage` is the single routing hub for the device UI. One instance is created per open device, via `DeviceService.createDevicePage(session)`.
 
 ### build()
 
@@ -104,8 +104,8 @@ If no app is active the method does nothing — apps that are not open do not re
 ## Call state restoration sequence
 
 ```
-Player opens phone
-  → PhonePage.build()
+Player opens device
+  → DevicePage.build()
       ├─ CallRegistry.getActivePartner(phoneNumber) != null?
       │    └─ YES: render ACTIVE_CALL screen
       ├─ CallRegistry.getPendingCallee(phoneNumber) != null?

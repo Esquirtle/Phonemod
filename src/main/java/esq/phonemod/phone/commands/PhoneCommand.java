@@ -3,7 +3,7 @@ package esq.phonemod.phone.commands;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 
 /**
- * Root command {@code /pg} for Playground plugin test utilities.
+ * Root command {@code /phonemod} for Phonemod admin/debug utilities.
  *
  * <p>Subcommands:
  * <ul>
@@ -13,7 +13,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
 public final class PhoneCommand extends AbstractCommandCollection {
 
     public PhoneCommand() {
-        super("pg", "Playground test commands");
+        super("phonemod", "Phonemod admin/debug commands");
         addSubCommand(new SendTextCommand());
     }
 }

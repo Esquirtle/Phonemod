@@ -1,0 +1,23 @@
+{
+  "DisplayNameKey": "phonemod.device.phone",
+  "DeviceType": "phone",
+  "ShellUiPath": "Pages/Phone/Phone.ui",
+  "ContentSelector": "#AppContent",
+  "HomeHolderSelector": "#APPHolder",
+  "HomeButtonSelector": "#HomeButton",
+  "MetadataKey": "PhoneNumber",
+  "DefaultApps": ["whatgram", "contacts", "calls", "settings", "appstore"],
+  "Capabilities": ["apps", "notifications", "messaging", "calls", "voice_route", "contacts"],
+  "DefaultThemeId": "Default",
+  "DefaultWallpaper": "Pages/Phone/hytel_logo.png",
+  "DefaultIconPack": "Default",
+  "SoundProfile": {
+    "MessageReceived": "Notification_Message_Received",
+    "MessageSent": "Notification_Message_Sent",
+    "Ringtone": "Ringtone_Nonkia"
+  },
+  "Selectors": {
+    "topbar": "#TopBar",
+    "bottombar": "#BottomBar"
+  }
+}
