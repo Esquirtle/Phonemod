@@ -16,7 +16,7 @@ Returns a unique identifier string for this app (e.g. `"myapp"`). Used as the ke
 ```java
 String getDisplayName()
 ```
-Human-readable name shown on the app icon label in `AppMenu`.
+Human-readable name shown on the app icon label in the home app grid.
 
 ```java
 String getAppButtonUI()
@@ -44,7 +44,7 @@ Handles a player interaction. Return `true` if the event was consumed (the frame
 ```java
 default int getSortOrder()
 ```
-Controls display order in `AppMenu`. Lower values appear first. Default: `0`.
+Controls display order in the home app grid. Lower values appear first. Default: `0`.
 
 ```java
 default void onOpen(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb)

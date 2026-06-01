@@ -235,7 +235,7 @@ public void onClose(PhoneAppContext ctx) {
 
 ## Controlling sort order
 
-Override `getSortOrder()` to control where your app appears in the `AppMenu` grid. Lower values appear first. The default is `0`.
+Override `getSortOrder()` to control where your app appears in the home app grid. Lower values appear first. The default is `0`.
 
 ```java
 @Override
