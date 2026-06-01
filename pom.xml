@@ -10,8 +10,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <!-- <hytale.install-dir>${user.home}/Library/Application Support</hytale.install-dir> -->
-        <hytale.install-dir>${user.home}/AppData/Roaming</hytale.install-dir>
+        <hytale.install-dir>${project.basedir}/server/HytaleServer.jar</hytale.install-dir>
         <hytale.patchline>pre-release</hytale.patchline>
         <phonemod.assets.dir>C:\Users\ed\IdeaProjects\Phonemod-Assets</phonemod.assets.dir>
     </properties>
@@ -70,7 +69,7 @@
             <version>LOCAL</version>
             <scope>system</scope>
             <systemPath>
-                ${hytale.install-dir}/Hytale/install/${hytale.patchline}/package/game/latest/Server/HytaleServer.jar
+                ${hytale.install-dir}
             </systemPath>
         </dependency>
     </dependencies>
