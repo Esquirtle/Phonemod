@@ -93,7 +93,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <hytale.patchline>pre-release</hytale.patchline>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <hytale.install-dir>/home/ed/hytale/WORKSPACE/dev/HytaleServer.jar</hytale.install-dir>
+    <hytale.install-dir>${user.home}/AppData/Roaming</hytale.install-dir>
     <phonemod.assets.dir>C:\Users\ed\IdeaProjects\Phonemod-Assets</phonemod.assets.dir>
   </properties>
 </project>

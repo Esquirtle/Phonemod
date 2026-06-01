@@ -70,7 +70,7 @@
             <version>LOCAL</version>
             <scope>system</scope>
             <systemPath>
-                ${hytale.install-dir}/Hytale/install/${hytale.patchline}/package/game/latest/Server/HytaleServer.jar
+                /home/ed/hytale/WORKSPACE/dev/HytaleServer.jar
             </systemPath>
         </dependency>
     </dependencies>
