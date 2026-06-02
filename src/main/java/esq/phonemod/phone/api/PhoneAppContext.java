@@ -8,6 +8,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.NotificationUtil;
 import esq.phonemod.phone.components.PhoneAppSessionState;
+import esq.phonemod.phone.sync.SyncChannelHandle;
+import esq.phonemod.phone.sync.SyncChannelType;
+import esq.phonemod.phone.sync.Viewer;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -152,6 +155,26 @@ public final class PhoneAppContext {
         LOGGER.atInfo().log("[PhoneAppContext] clearAllState phone=%s app=%s", phoneNumber, appId);
         s.clearApp(getSessionKey());
         store.putComponent(ref, PhoneAppSessionState.getComponentType(), s);
+    }
+
+    // ── Realtime sync ─────────────────────────────────────────────────────────
+
+    /**
+     * Returns a typed handle to a synchronized channel, scoped to this view
+     * ({@code phoneNumber} + {@code appId}). Use it to read shared state, subscribe
+     * this view for live updates, and publish mutations that re-render every
+     * subscriber.
+     *
+     * <pre>{@code
+     * var ch = ctx.channel(MyApp.ROOM, roomId);
+     * ch.subscribe();                  // in build(): re-render on every change
+     * render(ch.state(), cmd, evb);
+     * ch.update(s -> s.apply(move));    // in a handler: mutate + persist + broadcast
+     * }</pre>
+     */
+    @Nonnull
+    public <S> SyncChannelHandle<S> channel(@Nonnull SyncChannelType<S> type, @Nonnull String id) {
+        return new SyncChannelHandle<>(type, id, new Viewer(phoneNumber, appId));
     }
 
     // ── Convenience ───────────────────────────────────────────────────────────

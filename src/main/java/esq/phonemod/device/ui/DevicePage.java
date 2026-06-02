@@ -21,9 +21,14 @@ import esq.phonemod.device.components.DeviceSettings;
 import esq.phonemod.device.components.DeviceSettingsComponent;
 import esq.phonemod.device.core.DevicePageState;
 import esq.phonemod.device.core.DeviceSession;
+import esq.phonemod.device.routing.DefaultPhoneRouter;
+import esq.phonemod.device.routing.PhoneRouter;
+import esq.phonemod.device.routing.RouteContext;
+import esq.phonemod.device.routing.RouterHost;
 import esq.phonemod.device.theme.ThemeService;
 import esq.phonemod.device.events.DeviceAppCloseEvent;
 import esq.phonemod.device.events.DeviceAppOpenEvent;
+import esq.phonemod.device.events.DeviceCloseEvent;
 import esq.phonemod.device.events.DeviceOpenEvent;
 import esq.phonemod.device.events.PhoneEvents;
 import esq.phonemod.phone.api.PhoneApp;
@@ -46,9 +51,16 @@ import java.util.Map;
  * Generic custom UI page backed by a device shell.
  */
 public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceEventData>
-        implements DevicePageHandle {
+        implements DevicePageHandle, RouterHost {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
+    /**
+     * Shared, immutable router holding all built-in phone routes. Stateless and
+     * thread-safe (per-interaction state lives in {@link RouteContext}), so a
+     * single instance serves every open device.
+     */
+    private static final PhoneRouter ROUTER = DefaultPhoneRouter.createDefault();
 
     private final DeviceSession session;
 
@@ -123,6 +135,9 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         // toasts while connected. Guarded by page identity to avoid wiping a page
         // that already replaced this one.
         PhoneRegistry.unregisterPage(session.getDeviceId(), this);
+        // Notify listeners (e.g. the sync layer drops this phone's subscriptions)
+        // that the device page is gone.
+        PhoneEvents.post(new DeviceCloseEvent(session));
     }
 
     private void handleEventMap(@Nonnull Ref<EntityStore> ref,
@@ -132,79 +147,14 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         LOGGER.atFine().log("[DevicePage] handleDataEvent device=%s app=%s action=%s state=%s",
                 session.getDeviceId(), data.get("App"), action, session.getCurrentAppId());
 
-        if (PhoneEventActions.HOME.equals(action)) {
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            loadHomeState(cmd, evb);
-            sendUpdate(cmd, evb, false);
-            return;
-        }
-
-        if (PhoneEventActions.OPEN_APP.equals(action)) {
-            UICommandBuilder cmd = new UICommandBuilder();
-            UIEventBuilder evb = new UIEventBuilder();
-            PhoneApp<?> app = openApp(ref, store, data.get("App"), cmd, evb);
-            sendUpdate(app == null ? null : cmd, app == null ? null : evb, false);
-            return;
-        }
-
-        if (PhoneEventActions.OPEN_CHAT.equals(action) && !"whatgram".equals(session.getCurrentAppId())) {
-            String contact = param(data, "Contact");
-            if (contact != null && !contact.isBlank()) {
-                UICommandBuilder cmd = new UICommandBuilder();
-                UIEventBuilder evb = new UIEventBuilder();
-                PhoneApp<?> app = openApp(ref, store, "whatgram", cmd, evb);
-                if (app != null) {
-                    PhoneAppContext ctx = createContext(ref, store, "whatgram");
-                    if (ctx != null) {
-                        UICommandBuilder innerCmd = new UICommandBuilder();
-                        UIEventBuilder innerEvb = new UIEventBuilder();
-                        if (app.handleEvent(ctx, toPhoneEvent(data), innerCmd, innerEvb)) {
-                            sendUpdate(innerCmd, innerEvb, false);
-                            return;
-                        }
-                    }
-                    sendUpdate(cmd, evb, false);
-                    return;
-                }
-            }
-            sendUpdate(null, false);
-            return;
-        }
-
-        if (session.getShell().hasCapability("calls")
-                && PhoneEventActions.ANSWER_CALL.equals(action)) {
-            CallRegistry.answerCall(session.getDeviceId());
-            sendUpdate(null, false);
-            return;
-        }
-
-        if (session.getShell().hasCapability("calls")
-                && (PhoneEventActions.DECLINE_CALL.equals(action) || PhoneEventActions.HANG_UP.equals(action))) {
-            CallRegistry.hangUp(session.getDeviceId());
-            sendUpdate(null, false);
-            return;
-        }
-
-        PhoneApp<?> app = session.getCurrentApp();
-        String appId = session.getCurrentAppId();
-        if (app != null && appId != null) {
-            PhoneAppContext ctx = createContext(ref, store, appId);
-            if (ctx != null) {
-                UICommandBuilder cmd = new UICommandBuilder();
-                UIEventBuilder evb = new UIEventBuilder();
-                if (app.handleEvent(ctx, toPhoneEvent(data), cmd, evb)) {
-                    sendUpdate(cmd, evb, false);
-                    return;
-                }
-            }
-        }
-
-        LOGGER.atFine().log("[DevicePage] Unhandled action: %s", action);
-        sendUpdate(null, false);
+        // Declarative dispatch: the router matches the action to a Route
+        // (guards -> resolvers -> handlers) and applies the resulting UI flush
+        // through this page's RouterHost methods.
+        ROUTER.route(new RouteContext(ref, store, session, action, data, this));
     }
 
-    private void loadHomeState(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
+    @Override
+    public void loadHomeState(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
         session.setCurrentState(DevicePageState.HOME);
         session.setCurrentApp(null);
         session.setCurrentAppId(null);
@@ -255,8 +205,9 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         }
     }
 
+    @Override
     @Nullable
-    private PhoneApp<?> openApp(@Nonnull Ref<EntityStore> ref,
+    public PhoneApp<?> openApp(@Nonnull Ref<EntityStore> ref,
             @Nonnull Store<EntityStore> store,
             @Nullable String appId,
             @Nonnull UICommandBuilder cmd,
@@ -296,15 +247,28 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         return app;
     }
 
+    @Override
     @Nullable
-    private PhoneAppContext createContext(@Nonnull Ref<EntityStore> ref,
+    public PhoneAppContext createContext(@Nonnull Ref<EntityStore> ref,
             @Nonnull Store<EntityStore> store,
             @Nonnull String appId) {
         return new PhoneAppContext(ref, store, session.getPlayerRef(), session.getDeviceId(), appId,
                 session.getShell().getContentSelector());
     }
 
-    private PhoneEvent toPhoneEvent(@Nonnull Map<String, String> data) {
+    /**
+     * Flushes a UI update. {@link RouterHost} entry point used by the router to
+     * apply a {@code RouteResult}; {@code (null, null)} mirrors the legacy
+     * acknowledgement-only {@code sendUpdate(null, false)}.
+     */
+    @Override
+    public void sendUpdate(@Nullable UICommandBuilder cmd, @Nullable UIEventBuilder evb) {
+        sendUpdate(cmd, evb, false);
+    }
+
+    @Override
+    @Nonnull
+    public PhoneEvent toPhoneEvent(@Nonnull Map<String, String> data) {
         Map<String, String> params = new HashMap<>();
         for (Map.Entry<String, String> entry : data.entrySet()) {
             String key = normalizeKey(entry.getKey());
@@ -316,12 +280,6 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         return new PhoneEvent(data.getOrDefault("Action", ""),
                 data.getOrDefault("App", ""),
                 params);
-    }
-
-    @Nullable
-    private static String param(@Nonnull Map<String, String> data, @Nonnull String key) {
-        String value = data.get(key);
-        return value != null ? value : data.get("@" + key);
     }
 
     private static String normalizeKey(@Nonnull String key) {
@@ -417,6 +375,31 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         Calls.loadCallsState(session.getDeviceId(), session.getStore(), session.getRef(),
                 session.getShell().getContentSelector(), cmd, evb);
         session.setCurrentState(DevicePageState.CALLS);
+        sendUpdate(cmd, evb, false);
+    }
+
+    @Override
+    public void refreshApp(@Nonnull String appId) {
+        // Generic sync re-render: repaint the app only if it is the one open right
+        // now (the viewer may have navigated elsewhere since subscribing). Mirrors
+        // openApp's clear -> build -> theme so the rebuild is clean and themed.
+        if (!appId.equals(session.getCurrentAppId())) {
+            return;
+        }
+        PhoneApp<?> app = session.getCurrentApp();
+        if (app == null) {
+            return;
+        }
+        PhoneAppContext ctx = createContext(session.getRef(), session.getStore(), appId);
+        if (ctx == null) {
+            return;
+        }
+        UICommandBuilder cmd = new UICommandBuilder();
+        UIEventBuilder evb = new UIEventBuilder();
+        cmd.clear(session.getShell().getContentSelector());
+        app.build(ctx, cmd, evb);
+        ThemeService.apply(cmd, resolveThemeId(), session.getShell().getDefaultThemeId(),
+                app.getThemeableSelectors());
         sendUpdate(cmd, evb, false);
     }
 

@@ -27,6 +27,7 @@ public final class PhoneAssetPaths {
     public static final String CONTACTS_BUTTON_UI = "Pages/Phone/Components/ContactsButton.ui";
     public static final String CALLS_BUTTON_UI = "Pages/Phone/Components/CallsButton.ui";
     public static final String SETTINGS_BUTTON_UI = "Pages/Phone/Components/SettingsButton.ui";
+    public static final String GROUPCHAT_BUTTON_UI = "Pages/Phone/Components/GroupChatButton.ui";
 
     // ── App UI roots (loaded into #AppContent) ────────────────────────────────
     // Built on the Dust component library (DustLib.ui) and themed at runtime by
@@ -38,7 +39,11 @@ public final class PhoneAssetPaths {
     public static final String DUST_CALLS_UI = "Pages/Phone/DustCalls.ui";
     public static final String DUST_SETTINGS_UI = "Pages/Phone/DustSettings.ui";
     public static final String DUST_APPSTORE_UI = "Pages/Phone/DustAppStore.ui";
+    public static final String DUST_GROUPCHAT_UI = "Pages/Phone/DustGroupChat.ui";
 
     public static final String APPSTORE_BUTTON_UI = "Pages/Phone/Components/AppStoreButton.ui";
+
+    /** Message bubble reused by Group Chat (sender + body). */
+    public static final String GROUPCHAT_BUBBLE_UI = "Pages/Phone/Components/DustWhatgramBubble.ui";
 
 }
