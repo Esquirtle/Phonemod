@@ -86,7 +86,7 @@
       <artifactId>hytale-server</artifactId>
       <version>LOCAL</version>
       <scope>system</scope>
-      <systemPath>/home/ed/hytale/WORKSPACE/dev/HytaleServer.jar</systemPath>
+      <systemPath>${hytale.install-dir}</systemPath>
     </dependency>
   </dependencies>
   <properties>

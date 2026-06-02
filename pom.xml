@@ -10,7 +10,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <hytale.install-dir>${project.basedir}/server/HytaleServer.jar</hytale.install-dir>
+        <hytale.install-dir>/home/ed/hytale/WORKSPACE/dev/HytaleServer.jar</hytale.install-dir>
         <hytale.patchline>pre-release</hytale.patchline>
         <phonemod.assets.dir>C:\Users\ed\IdeaProjects\Phonemod-Assets</phonemod.assets.dir>
     </properties>
