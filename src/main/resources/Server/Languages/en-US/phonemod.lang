@@ -1,0 +1,45 @@
+# Phonemod translations (en-US)
+# Keys are resolved by the server's localization system.
+
+# ── AppStore ──────────────────────────────────────────────────────────────────
+appstore.install.denied=You do not have permission to install this app.
+appstore.uninstall.denied=This app cannot be uninstalled.
+appstore.launch.denied=You do not have permission to open this app.
+
+appstore.action.install=Install
+appstore.action.uninstall=Uninstall
+appstore.action.open=Open
+
+appstore.empty.installed=No apps installed. Visit 'Available' to install apps.
+appstore.empty.available=No apps available for installation.
+appstore.empty.restricted=No restricted apps to show.
+
+# ── Permissions command ───────────────────────────────────────────────────────
+permissions.none=(none)
+
+permissions.player.header=Permission info for {0}:
+permissions.player.groups=  Roles: {0}
+permissions.player.direct=  Direct permissions: {0}
+
+permissions.check.has={0} has permission {1}.
+permissions.check.lacks={0} does not have permission {1}.
+
+permissions.grant.success=Granted permission {0} to {1}.
+permissions.revoke.success=Revoked permission {0} from {1}.
+
+permissions.roles.list=Roles for {0}: {1}
+
+permissions.role.grant.success=Granted role {0} to {1}.
+permissions.role.revoke.success=Revoked role {0} from {1}.
+permissions.role.list.header=Known roles:
+permissions.role.perms.header=Permissions for role {0}:
+permissions.role.addperm.success=Added permission {0} to role {1}.
+permissions.role.removeperm.success=Removed permission {0} from role {1}.
+
+permissions.apps.header=Installed apps for {0}:
+permissions.apps.noDevices={0} has no active devices.
+permissions.apps.install.success=Installed {0} on {2} device(s) for {1}.
+permissions.apps.uninstall.success=Uninstalled {0} from {2} device(s) for {1}.
+permissions.apps.uninstall.systemProtected=Cannot uninstall system app {0}.
+
+permissions.error.playerNotFound=Player not found: {0}

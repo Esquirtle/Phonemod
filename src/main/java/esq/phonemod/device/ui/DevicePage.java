@@ -9,13 +9,16 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import esq.permission.api.AppPermissionService;
 import esq.phonemod.device.api.DevicePageHandle;
 import esq.phonemod.device.components.DeviceSettings;
 import esq.phonemod.device.components.DeviceSettingsComponent;
@@ -35,7 +38,10 @@ import esq.phonemod.phone.api.PhoneApp;
 import esq.phonemod.phone.api.PhoneAppContext;
 import esq.phonemod.phone.api.PhoneEvent;
 import esq.phonemod.phone.api.PhoneEventActions;
+import esq.phonemod.phone.apps.AppStoreApp;
 import esq.phonemod.phone.apps.helpers.Calls;
+import esq.phonemod.phone.appstore.AppInstallService;
+import esq.phonemod.phone.appstore.DeviceInstalledAppsComponent;
 import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.CallRegistry;
 import esq.phonemod.phone.messaging.PhoneRegistry;
@@ -46,6 +52,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Generic custom UI page backed by a device shell.
@@ -85,6 +93,16 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         PhoneEvents.post(new DeviceOpenEvent(session));
         cmd.append(session.getShell().getShellUiPath());
         ThemeService.applyShell(cmd, session.getShell(), resolveThemeId());
+
+        // Seed installed apps on every open (idempotent for system apps,
+        // once-only for non-system defaults — Decision D).
+        UUID playerUuid = resolvePlayerUuid(ref, store);
+        if (playerUuid != null) {
+            AppInstallService.get().seedDefaults(
+                    ref, store, playerUuid,
+                    session.getDeviceId(),
+                    session.getShell().getDefaultApps());
+        }
 
         String homeButton = session.getShell().getHomeButtonSelector();
         if (homeButton != null && !homeButton.isBlank()) {
@@ -176,16 +194,58 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         buildAppMenu(cmd, evb);
     }
 
+    /**
+     * Builds the home grid from the player's installed apps (Decision B).
+     *
+     * <p>System apps are always shown first (in their registration order), followed
+     * by installed non-system apps. Hidden-permission apps are suppressed. The grid
+     * iterates the {@link DeviceInstalledAppsComponent} rather than the static
+     * {@code defaultApps} array so that the home screen reflects actual installs.
+     */
     private void buildAppMenu(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
         String holder = session.getShell().getHomeHolderSelector();
         cmd.clear(holder);
 
-        int index = 0;
+        // Build ordered list: system apps first, then installed non-system apps.
+        java.util.List<String> appIds = new java.util.ArrayList<>();
+
+        // System apps — always present in device-asset declaration order.
         for (String appId : session.getShell().getDefaultApps()) {
             PhoneApp<?> app = PhoneService.get().getApp(appId);
+            if (app != null && app.isSystemApp()) {
+                appIds.add(appId);
+            }
+        }
+
+        // Non-system installed apps from the persistent component.
+        DeviceInstalledAppsComponent comp = session.getStore().getComponent(
+                session.getRef(), DeviceInstalledAppsComponent.getComponentType());
+        if (comp != null) {
+            Set<String> installed = comp.getInstalled(session.getDeviceId());
+            for (String appId : installed) {
+                if ("__seeded__".equals(appId)) {
+                    continue;
+                }
+                PhoneApp<?> app = PhoneService.get().getApp(appId);
+                if (app != null && !app.isSystemApp()) {
+                    appIds.add(appId);
+                }
+            }
+        }
+
+        int index = 0;
+        UUID playerUuid = resolvePlayerUuid(session.getRef(), session.getStore());
+
+        for (String appId : appIds) {
+            PhoneApp<?> app = PhoneService.get().getApp(appId);
             if (app == null) {
-                LOGGER.atWarning().log("[DevicePage] Unknown default app %s for device %s",
-                        appId, session.getDeviceAssetId());
+                continue;
+            }
+            // Suppress hidden-permission apps (player lacks perm AND visibility = hidden).
+            String requiredNode = app.getRequiredPermission();
+            if (requiredNode != null && "hidden".equals(app.getPermissionVisibility())
+                    && playerUuid != null
+                    && !AppPermissionService.get().hasPermission(playerUuid, requiredNode)) {
                 continue;
             }
             String buttonUI = app.getAppButtonUI();
@@ -221,10 +281,26 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             return null;
         }
 
+        // Decision C: re-verify permission at launch time (one check per open).
+        String requiredNode = app.getRequiredPermission();
+        if (requiredNode != null) {
+            UUID playerUuid = resolvePlayerUuid(ref, store);
+            if (playerUuid == null || !AppPermissionService.get().hasPermission(playerUuid, requiredNode)) {
+                PlayerRef pr = store.getComponent(ref, PlayerRef.getComponentType());
+                if (pr != null) {
+                    pr.sendMessage(Message.translation("phonemod.appstore.launch.denied"));
+                }
+                return null;
+            }
+        }
+
         PhoneAppContext ctx = createContext(ref, store, appId);
         if (ctx == null) {
             return null;
         }
+
+        // Inject device type so apps can filter the catalog without a session ref.
+        ctx.setState(AppStoreApp.DEVICE_TYPE_STATE_KEY, session.getShell().getDeviceType());
 
         PhoneApp<?> currentApp = session.getCurrentApp();
         String previousAppId = session.getCurrentAppId();
@@ -432,6 +508,17 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
                     app.getThemeableSelectors());
         }
         sendUpdate(cmd, null, false);
+    }
+
+    /**
+     * Resolves the UUID of the player entity at {@code ref}, or {@code null} if
+     * the entity has no {@link PlayerRef} (non-player entity, already despawned).
+     */
+    @Nullable
+    private UUID resolvePlayerUuid(@Nonnull Ref<EntityStore> ref,
+            @Nonnull Store<EntityStore> store) {
+        PlayerRef pr = store.getComponent(ref, PlayerRef.getComponentType());
+        return pr != null ? pr.getUuid() : null;
     }
 
     private void playSound(@Nullable String soundId) {

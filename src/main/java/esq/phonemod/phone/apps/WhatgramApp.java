@@ -83,6 +83,11 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
     }
 
     @Override
+    public boolean isSystemApp() {
+        return true;
+    }
+
+    @Override
     public Map<String, String> getThemeableSelectors() {
         // Background-themeable surfaces on the Dust Whatgram root. These live in
         // the single root and are present in BOTH views, so theme re-application

@@ -3,6 +3,7 @@ package esq.phonemod.setup;
 import com.hypixel.hytale.logger.HytaleLogger;
 
 import esq.phonemod.phone.commands.PhoneCommand;
+import esq.phonemod.phone.commands.permissions.PermissionsCommand;
 import esq.phonemod.PhoneMod;
 
 public class CommandRegistryManager {
@@ -17,5 +18,6 @@ public class CommandRegistryManager {
     public void register() {
         LOGGER.atInfo().log("Registering commands...");
         plugin.getCommandRegistry().registerCommand(new PhoneCommand());
+        plugin.getCommandRegistry().registerCommand(new PermissionsCommand());
     }
 }

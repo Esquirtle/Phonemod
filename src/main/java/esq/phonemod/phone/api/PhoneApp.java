@@ -100,4 +100,65 @@ public interface PhoneApp<S extends Enum<S>> {
             String callerNumber,
             String callerName) {
     }
+
+    // ── AppStore / permission integration (Decision D) ────────────────────────
+
+    /**
+     * Returns the permission node required to install and open this app, or
+     * {@code null} if the app is freely accessible to all players.
+     *
+     * <p>The node is a plain dot-separated string (e.g.
+     * {@code "apps.police.database"}). Evaluated by
+     * {@link esq.phonemod.phone.appstore.AppCatalogService} at install time and
+     * again at every open via {@link esq.phonemod.device.ui.DevicePage}.
+     */
+    @javax.annotation.Nullable
+    default String getRequiredPermission() {
+        return null;
+    }
+
+    /**
+     * Returns how this app is presented to a player who lacks the required
+     * permission.
+     *
+     * <ul>
+     *   <li>{@code "locked"} (default) — visible in the App Store with a locked
+     *       badge; cannot be installed or opened.</li>
+     *   <li>{@code "hidden"} — completely suppressed from every UI surface.</li>
+     * </ul>
+     *
+     * <p>Only consulted when {@link #getRequiredPermission()} returns non-null.
+     */
+    @javax.annotation.Nonnull
+    default String getPermissionVisibility() {
+        return "locked";
+    }
+
+    /**
+     * Returns the device type IDs this app supports, or an empty array to
+     * indicate it runs on all device types.
+     *
+     * <p>Values match the {@code DeviceType} field in the device asset JSON
+     * (e.g. {@code "phone"}, {@code "tablet"}). The
+     * {@link esq.phonemod.phone.appstore.AppCatalogService} uses this to filter
+     * the catalog for a specific device.
+     */
+    @javax.annotation.Nonnull
+    default String[] getSupportedDeviceTypes() {
+        return new String[0];
+    }
+
+    /**
+     * Returns {@code true} if this is a system app — one that is force-present
+     * on every device on every open and cannot be uninstalled by the player.
+     *
+     * <p>Apps that return {@code true} must also be listed in the device asset's
+     * {@code DefaultApps} array. Override to opt out of user management.
+     *
+     * @implNote Default is {@code false}. Built-in default apps (Whatgram,
+     * Contacts, Calls, Settings, AppStore) return {@code true}.
+     */
+    default boolean isSystemApp() {
+        return false;
+    }
 }
