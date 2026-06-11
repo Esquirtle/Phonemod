@@ -1,7 +1,7 @@
 # Scaffolds & Checklists
 
 Copy-paste starting points for new apps and devices, plus quick validation
-checklists. For the full explanations see `creating-a-phone-app.md`.
+checklists. For the full explanations see [creating-apps.md](creating-apps.md).
 
 ---
 

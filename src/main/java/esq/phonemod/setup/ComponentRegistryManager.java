@@ -4,6 +4,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.PhoneMod;
 import esq.phonemod.device.components.DeviceSettingsComponent;
+import esq.phonemod.phone.appstore.DeviceInstalledAppsComponent;
 import esq.phonemod.phone.components.CallHistoryComponent;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
 import esq.phonemod.phone.components.PhoneAppSessionState;
@@ -51,6 +52,13 @@ public class ComponentRegistryManager {
                         "PhoneAppSessionState",
                         PhoneAppSessionState.CODEC);
         PhoneAppSessionState.setComponentType(sessionStateType);
+
+        ComponentType<EntityStore, DeviceInstalledAppsComponent> installedAppsType =
+                plugin.getEntityStoreRegistry().registerComponent(
+                        DeviceInstalledAppsComponent.class,
+                        "DeviceInstalledApps",
+                        DeviceInstalledAppsComponent.CODEC);
+        DeviceInstalledAppsComponent.setComponentType(installedAppsType);
     }
 
     public void registerSystems() {

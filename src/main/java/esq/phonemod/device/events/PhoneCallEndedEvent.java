@@ -3,7 +3,7 @@ package esq.phonemod.device.events;
 import javax.annotation.Nonnull;
 
 /**
- * Fired when a call ends (either side hung up).
+ * Fired once per participant when an active call ends.
  */
 public final class PhoneCallEndedEvent implements DeviceEvent {
 

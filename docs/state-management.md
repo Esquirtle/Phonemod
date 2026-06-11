@@ -34,7 +34,9 @@ Map<sessionKey, Map<key, value>>
 
 where `sessionKey` is `phoneNumber + "|" + appId`. This means state is isolated per physical phone per app — if the same player has two phones open simultaneously, each phone's apps have completely independent state. `PhoneAppContext` derives and applies the session key automatically from its `phoneNumber` and `appId` fields; you never construct it yourself.
 
-The component is registered with the ECS. Its data is session-only — it resets naturally when the player's entity is unloaded (logout or server restart). There is no persistence across sessions.
+The component is registered with a codec and mutations are written with
+`store.putComponent(...)`. State therefore survives entity unloads, logout, and
+server restarts until the app explicitly clears it.
 
 ## Accessing state via PhoneAppContext
 
@@ -126,12 +128,13 @@ public final class MyApp extends StatefulPhoneApp<MyApp.State> {
 
 ## State lifetime
 
-State is reset when the player's entity is unloaded. This happens on:
-- Player logout
-- Server restart
-- Any other event that causes the entity to be removed from the store
+State persists across sessions. Use `clearState(key)` for temporary values when
+leaving a view, and `clearAllState()` when the app needs a complete reset.
 
-There is no built-in mechanism to persist phone app state across sessions. If your app needs cross-session persistence, use a separate persistent data component (see the `hytale-persistent-data` skill).
+`PhoneAppSessionState` is suitable for small string-backed app preferences and
+navigation state. Use a dedicated persistent component or sync channel for
+larger domain data, structured records, shared state, or data with an independent
+lifecycle.
 
 ## Key naming recommendations
 

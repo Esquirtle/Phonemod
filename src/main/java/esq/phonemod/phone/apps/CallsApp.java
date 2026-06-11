@@ -70,6 +70,11 @@ public final class CallsApp extends StatefulPhoneApp<CallsApp.State> {
     }
 
     @Override
+    public boolean isSystemApp() {
+        return true;
+    }
+
+    @Override
     public Map<String, String> getThemeableSelectors() {
         return Map.of(
                 "appHeader", Calls.SEL_HEADER,

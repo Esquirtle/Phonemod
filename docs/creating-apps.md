@@ -38,14 +38,11 @@ public final class MyCustomPhoneApp extends StatefulPhoneApp<MyCustomPhoneApp.St
     @Override
     public void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
         appendMainUI(ctx, cmd);
-        if (getState(ctx) == State.DETAILS) {
-            cmd.append(ctx.getContentSelector(), "Pages/Phone/Components/MyDetails.ui");
-            evb.addEventBinding(CustomUIEventBindingType.Activating,
-                    "#BackButton", EventData.of("Action", PhoneEventActions.BACK), false);
-        } else {
-            evb.addEventBinding(CustomUIEventBindingType.Activating,
-                    "#OpenDetailsButton", EventData.of("Action", "open_details"), false);
-        }
+        boolean details = getState(ctx) == State.DETAILS;
+        PhoneUi.setVisible(cmd, "#MainView", !details);
+        PhoneUi.setVisible(cmd, "#DetailsView", details);
+        PhoneUi.bindAction(evb, "#OpenDetailsButton", "open_details");
+        PhoneUi.bindBack(evb, "#BackButton");
     }
 
     @Override
@@ -71,6 +68,9 @@ public final class MyCustomPhoneApp extends StatefulPhoneApp<MyCustomPhoneApp.St
 ### Key points
 
 - Always call `appendMainUI(ctx, cmd)` at the top of `build()`. It clears the shell content area (`ctx.getContentSelector()`) and loads `getUIPath()`.
+- Keep app views inside that root UI and toggle app-owned selectors. Do not
+  append additional views directly into `ctx.getContentSelector()` after
+  `appendMainUI()`.
 - Return `true` from `handleEvent` if you handled the event (the framework sends your builders as the update). Return `false` if you did not (the framework sends a no-op).
 - After mutating state in `handleEvent`, call `build()` with the same builders to produce the updated UI in the same response.
 
@@ -213,7 +213,7 @@ public void onIncomingMessage(PhoneAppContext ctx, String fromNumber) {
 @Override
 public void onIncomingCall(PhoneAppContext ctx, String callerNumber, String callerName) {
     // Called when an incoming call arrives while this app is open.
-    // build() is called automatically after this returns.
+    // The framework shows the incoming-call overlay after this returns.
 }
 ```
 
@@ -235,7 +235,10 @@ public void onClose(PhoneAppContext ctx) {
 
 ## Controlling sort order
 
-Override `getSortOrder()` to control where your app appears in the home app grid. Lower values appear first. The default is `0`.
+Override `getSortOrder()` to control sorted registry/catalog views and where an
+installed non-system app appears in the home app grid. Lower values appear
+first. System apps retain their device asset `DefaultApps` order. The default
+is `0`; equal values are ordered by app ID.
 
 ```java
 @Override
@@ -261,15 +264,11 @@ public final class NotesApp extends StatefulPhoneApp<NotesApp.State> {
     @Override
     public void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
         appendMainUI(ctx, cmd);
-        if (getState(ctx) == State.EDIT) {
-            cmd.append(ctx.getContentSelector(), "Pages/Phone/Components/NotesEdit.ui");
-            evb.addEventBinding(CustomUIEventBindingType.Activating,
-                    "#BackButton", EventData.of("Action", PhoneEventActions.BACK), false);
-        } else {
-            cmd.append(ctx.getContentSelector(), "Pages/Phone/Components/NotesList.ui");
-            evb.addEventBinding(CustomUIEventBindingType.Activating,
-                    "#OpenNoteButton", EventData.of("Action", "open_note"), false);
-        }
+        boolean editing = getState(ctx) == State.EDIT;
+        PhoneUi.setVisible(cmd, "#NotesListView", !editing);
+        PhoneUi.setVisible(cmd, "#NotesEditView", editing);
+        PhoneUi.bindAction(evb, "#OpenNoteButton", "open_note");
+        PhoneUi.bindBack(evb, "#BackButton");
     }
 
     @Override

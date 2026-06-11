@@ -1,5 +1,11 @@
 # Events
 
+Phonemod has two separate event models:
+
+- `PhoneEvent`: normalized UI action data delivered to `PhoneApp.handleEvent()`.
+- `DeviceEvent`: typed framework lifecycle and communication events distributed
+  synchronously through `PhoneEvents`.
+
 ## PhoneEvent
 
 `PhoneEvent` is an immutable payload created by `DevicePage` from the raw `PhoneEventData` codec object. It is passed to `PhoneApp.handleEvent()`.
@@ -18,7 +24,10 @@ event.getParam("key", "default") // @Nonnull — safe overload
 
 ### Phone-level actions (intercepted by DevicePage)
 
-These are never passed to `handleEvent`. Do not handle them in your app.
+These actions normally use framework routes before app dispatch. If a route's
+guard rejects the action, the router intentionally falls through to the current
+app's `handleEvent()`. Apps generally should not handle them, except where that
+fallback is part of the app's behavior, such as `open_chat` in Whatgram.
 
 | Constant | Value | Description | Payload keys |
 |----------|-------|-------------|--------------|
@@ -157,3 +166,34 @@ public boolean handleEvent(PhoneAppContext ctx, PhoneEvent event,
     return false;  // unhandled — framework sends a no-op update
 }
 ```
+
+## DeviceEvent Bus
+
+Keep the listener instance used during setup and remove that specific listener
+during shutdown:
+
+```java
+private final Consumer<PhoneMessageReceivedEvent> messageListener =
+        this::onMessageReceived;
+
+PhoneEvents.subscribe(PhoneMessageReceivedEvent.class, messageListener);
+PhoneEvents.unsubscribe(PhoneMessageReceivedEvent.class, messageListener);
+```
+
+`PhoneEvents.post()` invokes listeners synchronously on the posting thread.
+Listeners that mutate world or ECS state must dispatch to the appropriate world
+thread. `unsubscribeAll(type)` removes every subscriber for that type and is
+intended only for framework-wide shutdown.
+
+Current emission contract:
+
+| Event | Emitted when |
+|-------|--------------|
+| `DeviceOpenEvent` / `DeviceCloseEvent` | Device page opens or is dismissed |
+| `DeviceAppOpenEvent` / `DeviceAppCloseEvent` | App opens or closes |
+| `DeviceSettingsChangedEvent` | Settings app persists a change |
+| `PhoneCallStartedEvent` | Call registry accepts an outgoing attempt |
+| `PhoneCallAnsweredEvent` | Pending call connects; emitted once per participant |
+| `PhoneCallEndedEvent` | Active call ends; emitted once per participant |
+| `PhoneCallMissedEvent` | Pending call ends before answer |
+| `PhoneMessageSentEvent` / `PhoneMessageReceivedEvent` | Registry accepts a message, before delivery or queueing |

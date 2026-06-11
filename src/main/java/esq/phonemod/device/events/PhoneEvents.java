@@ -54,8 +54,28 @@ public final class PhoneEvents {
     }
 
     /**
+     * Removes one listener previously registered for {@code eventType}.
+     *
+     * @return {@code true} if the listener was registered and removed
+     */
+    public static <T extends DeviceEvent> boolean unsubscribe(
+            @Nonnull Class<T> eventType,
+            @Nonnull Consumer<T> listener) {
+        List<Consumer> listeners = LISTENERS.get(eventType);
+        if (listeners == null) {
+            return false;
+        }
+        boolean removed = listeners.remove(listener);
+        if (listeners.isEmpty()) {
+            LISTENERS.remove(eventType, listeners);
+        }
+        return removed;
+    }
+
+    /**
      * Removes all subscriptions for {@code eventType}.
-     * Useful when a plugin shuts down and wants to avoid leaking listeners.
+     * Framework owners may use this during full shutdown. Integrations should
+     * prefer {@link #unsubscribe} so they do not remove unrelated listeners.
      */
     public static void unsubscribeAll(@Nonnull Class<? extends DeviceEvent> eventType) {
         LISTENERS.remove(eventType);

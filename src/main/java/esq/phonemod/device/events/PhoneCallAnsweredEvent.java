@@ -3,7 +3,7 @@ package esq.phonemod.device.events;
 import javax.annotation.Nonnull;
 
 /**
- * Fired when an incoming call is answered.
+ * Fired once per participant when a pending call becomes active.
  */
 public final class PhoneCallAnsweredEvent implements DeviceEvent {
 

@@ -5,6 +5,7 @@ import esq.phonemod.phone.api.PhoneApp;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,9 @@ public final class PhoneAppRegistry {
     @Nonnull
     public List<PhoneApp<?>> getApps() {
         List<PhoneApp<?>> sorted = new ArrayList<>(apps.values());
-        sorted.sort((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()));
+        sorted.sort(Comparator
+                .comparingInt((PhoneApp<?> app) -> app.getSortOrder())
+                .thenComparing(PhoneApp::getId));
         return Collections.unmodifiableList(sorted);
     }
 

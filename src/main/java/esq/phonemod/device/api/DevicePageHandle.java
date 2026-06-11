@@ -32,5 +32,14 @@ public interface DevicePageHandle {
      */
     default void reapplyTheme(@Nonnull String themeId) {
     }
+
+    /**
+     * Re-renders the given app on this live page if it is the one currently open.
+     * Generic push hook used by the sync layer to repaint a viewer after shared
+     * state changes. Default is a no-op so non-app page implementations need not
+     * support synchronization.
+     */
+    default void refreshApp(@Nonnull String appId) {
+    }
 }
 

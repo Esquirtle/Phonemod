@@ -94,6 +94,11 @@ public final class SettingsApp extends StatefulPhoneApp<SettingsApp.State> {
     }
 
     @Override
+    public boolean isSystemApp() {
+        return true;
+    }
+
+    @Override
     public Map<String, String> getThemeableSelectors() {
         return Map.of(
                 "appHeader", SEL_HEADER,

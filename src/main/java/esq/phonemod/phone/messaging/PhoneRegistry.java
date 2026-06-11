@@ -10,6 +10,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.device.api.DevicePageHandle;
 import esq.phonemod.device.events.PhoneNotification;
 import esq.phonemod.device.events.PhoneNotifications;
+import esq.phonemod.device.events.PhoneEvents;
+import esq.phonemod.device.events.PhoneMessageReceivedEvent;
+import esq.phonemod.device.events.PhoneMessageSentEvent;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
 
 import javax.annotation.Nonnull;
@@ -138,6 +141,9 @@ public final class PhoneRegistry {
      */
     public static void deliver(@Nonnull String toNumber, @Nonnull TextMessage message) {
         LOGGER.atFine().log("[PhoneRegistry] deliver to=%s from=%s", toNumber, message.fromNumber());
+        PhoneEvents.post(new PhoneMessageSentEvent(message.fromNumber(), toNumber, message.body()));
+        PhoneEvents.post(new PhoneMessageReceivedEvent(
+                toNumber, message.fromNumber(), message.fromName(), message.body()));
 
         OnlineEntry openEntry = online.get(toNumber);
         if (openEntry != null) {

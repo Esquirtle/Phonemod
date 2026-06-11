@@ -66,6 +66,11 @@ public final class ContactsApp extends StatefulPhoneApp<ContactsApp.State> {
     }
 
     @Override
+    public boolean isSystemApp() {
+        return true;
+    }
+
+    @Override
     public Map<String, String> getThemeableSelectors() {
         return Map.of(
                 "appHeader", Contacts.SEL_HEADER,

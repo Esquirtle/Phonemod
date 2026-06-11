@@ -3,7 +3,7 @@ package esq.phonemod.device.events;
 import javax.annotation.Nonnull;
 
 /**
- * Fired when a phone call is initiated (outgoing).
+ * Fired when the call registry accepts an outgoing call attempt.
  */
 public final class PhoneCallStartedEvent implements DeviceEvent {
 

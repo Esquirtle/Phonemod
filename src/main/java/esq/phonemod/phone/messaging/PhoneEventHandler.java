@@ -5,6 +5,8 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import esq.phonemod.phone.sync.SyncService;
+import esq.phonemod.phone.sync.room.RoomService;
 
 import java.util.function.Consumer;
 
@@ -32,9 +34,12 @@ public final class PhoneEventHandler implements Consumer<PlayerDisconnectEvent> 
             return;
         }
 
-        // Clean up any active/pending calls for all phones owned by this player before unregistering
+        // Clean up any active/pending calls and sync subscriptions/rooms for all
+        // phones owned by this player before unregistering.
         for (String phoneNumber : PhoneRegistry.getPhoneNumbersByRef(ref)) {
             CallRegistry.cleanupOnDisconnect(phoneNumber);
+            SyncService.unsubscribePhone(phoneNumber);
+            RoomService.leaveAll(phoneNumber);
         }
         PhoneRegistry.unregisterByRef(ref);
     }
