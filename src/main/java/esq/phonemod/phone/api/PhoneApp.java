@@ -36,6 +36,12 @@ public interface PhoneApp<S extends Enum<S>> {
 
     String getUIPath();
 
+    /**
+     * Controls ordering in sorted registry/catalog views and among installed
+     * non-system apps on the home grid. Lower values appear first. System apps
+     * on the home grid retain the device asset's {@code DefaultApps} order.
+     * Equal values are ordered by app ID.
+     */
     default int getSortOrder() {
         return 0;
     }
@@ -92,7 +98,6 @@ public interface PhoneApp<S extends Enum<S>> {
             String fromNumber,
             UICommandBuilder cmd,
             UIEventBuilder evb) {
-        onIncomingMessage(ctx, fromNumber);
         return false;
     }
 
@@ -140,8 +145,8 @@ public interface PhoneApp<S extends Enum<S>> {
      *
      * <p>Values match the {@code DeviceType} field in the device asset JSON
      * (e.g. {@code "phone"}, {@code "tablet"}). The
-     * {@link esq.phonemod.phone.appstore.AppCatalogService} uses this to filter
-     * the catalog for a specific device.
+     * The app catalog and device page use this to filter apps and reject
+     * incompatible launches.
      */
     @javax.annotation.Nonnull
     default String[] getSupportedDeviceTypes() {

@@ -7,8 +7,6 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.device.core.DeviceService;
-import esq.phonemod.device.events.PhoneEvents;
-import esq.phonemod.device.events.PhoneMessageSentEvent;
 import esq.phonemod.device.services.DeviceCallService;
 import esq.phonemod.device.services.DeviceContactService;
 import esq.phonemod.device.services.DeviceMessagingService;
@@ -258,9 +256,6 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
         // Deliver to recipient via messaging service.
         DeviceService.get().getMessagingService().deliver(currentContact,
                 new TextMessage(myNumber, myNumber, trimmedBody));
-
-        // Emit typed event for framework observers.
-        PhoneEvents.post(new PhoneMessageSentEvent(myNumber, currentContact, trimmedBody));
 
         // Re-render the message list from history — single source of truth, so the
         // bubble indices can never drift from the displayed list.

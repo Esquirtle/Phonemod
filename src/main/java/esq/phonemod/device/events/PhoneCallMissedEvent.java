@@ -3,7 +3,8 @@ package esq.phonemod.device.events;
 import javax.annotation.Nonnull;
 
 /**
- * Fired when an incoming call goes unanswered and is cleared.
+ * Fired when an incoming call ends before being answered, including decline,
+ * caller cancellation, timeout, or an unavailable callee.
  */
 public final class PhoneCallMissedEvent implements DeviceEvent {
 

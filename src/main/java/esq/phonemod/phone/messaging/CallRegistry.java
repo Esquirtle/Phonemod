@@ -13,6 +13,11 @@ import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.phone.components.CallHistoryComponent;
 import esq.phonemod.phone.components.CallRecord;
+import esq.phonemod.device.events.PhoneCallAnsweredEvent;
+import esq.phonemod.device.events.PhoneCallEndedEvent;
+import esq.phonemod.device.events.PhoneCallMissedEvent;
+import esq.phonemod.device.events.PhoneCallStartedEvent;
+import esq.phonemod.device.events.PhoneEvents;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -238,6 +243,7 @@ public final class CallRegistry {
 
         PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
         PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(calleeNumber);
+        PhoneEvents.post(new PhoneCallStartedEvent(callerNumber, calleeNumber));
 
         if (calleeEntry == null) {
             // Callee offline — log missed on callee side when possible, failed on caller side
@@ -249,6 +255,7 @@ public final class CallRegistry {
                     callerEntry.page().onCallEnded();
                 });
             }
+            PhoneEvents.post(new PhoneCallMissedEvent(calleeNumber, callerNumber));
             return;
         }
 
@@ -282,6 +289,8 @@ public final class CallRegistry {
         activeCalls.put(callerNumber, calleeNumber);
         activeCalls.put(calleeNumber, callerNumber);
         LOGGER.atFine().log("[CallRegistry] Call connected: %s ↔ %s", callerNumber, calleeNumber);
+        PhoneEvents.post(new PhoneCallAnsweredEvent(callerNumber, calleeNumber));
+        PhoneEvents.post(new PhoneCallAnsweredEvent(calleeNumber, callerNumber));
 
         PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
         PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(calleeNumber);
@@ -303,6 +312,8 @@ public final class CallRegistry {
         if (partnerNumber != null) {
             activeCalls.remove(partnerNumber);
             LOGGER.atFine().log("[CallRegistry] Call ended: %s ↔ %s", number, partnerNumber);
+            PhoneEvents.post(new PhoneCallEndedEvent(number, partnerNumber));
+            PhoneEvents.post(new PhoneCallEndedEvent(partnerNumber, number));
             long ts = System.currentTimeMillis();
 
             PhoneRegistry.OnlineEntry myEntry      = PhoneRegistry.getOnlineEntry(number);
@@ -333,6 +344,7 @@ public final class CallRegistry {
             pendingCalls.remove(callerNumber);
             pendingSince.remove(callerNumber);
             LOGGER.atFine().log("[CallRegistry] Call declined (%s → %s)", callerNumber, number);
+            PhoneEvents.post(new PhoneCallMissedEvent(number, callerNumber));
             long ts = System.currentTimeMillis();
 
             PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
@@ -356,6 +368,7 @@ public final class CallRegistry {
         pendingSince.remove(number);
         if (calleeNumber != null) {
             LOGGER.atFine().log("[CallRegistry] Call cancelled by caller (%s → %s)", number, calleeNumber);
+            PhoneEvents.post(new PhoneCallMissedEvent(calleeNumber, number));
             long ts = System.currentTimeMillis();
 
             // Record the cancelled outgoing attempt on the caller's history.

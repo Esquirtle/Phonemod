@@ -9,6 +9,7 @@ import esq.phonemod.phone.core.PhoneService;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -85,6 +86,9 @@ public final class AppCatalogService {
                 result.add(app);
             }
         }
+        result.sort(Comparator
+                .comparingInt((PhoneApp<?> app) -> app.getSortOrder())
+                .thenComparing(PhoneApp::getId));
         return result;
     }
 

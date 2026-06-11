@@ -10,8 +10,8 @@ Tracks the device's top-level navigation state. This is `DevicePage`-internal �
 |-------|----------|----------|
 | `HOME` | `loadHomeState()` / `home` action | App grid (built into `#APPHolder`) |
 | `APP` | `openApp()` called | The active app's UI (loaded into `#AppContent`) |
-| `CALLS` | `onCallEnded()` when no app was active before the call | Calls screen (dialer + history) |
-| `INCOMING_CALL` | `onIncomingCall()` with no active app; or call-state restore on open | Incoming-call overlay (`DustIncomingCall.ui`) |
+| `CALLS` | `onCallEnded()` | Calls screen (dialer + history) |
+| `INCOMING_CALL` | `onIncomingCall()` or call-state restore on open | Incoming-call overlay (`DustIncomingCall.ui`) |
 | `ACTIVE_CALL` | `onCallAnswered()`; or call-state restore on open | Active-call overlay (`DustActiveCall.ui`) |
 
 ## DevicePage — routing hub
@@ -51,12 +51,16 @@ Any action not matched above is forwarded to `currentApp.handleEvent()`. If `cur
 Called when `open_app` is received:
 
 1. Look up the app by ID in `PhoneService`.
-2. Create a `PhoneAppContext` for the player.
-3. If a different app was open, call `currentApp.onClose(ctx)`.
-4. Update `currentApp`, `currentAppId`, and `currentState` (`APP`).
+2. If an app was open, call its `onClose()` with a context scoped to that closing
+   app and post `DeviceAppCloseEvent`.
+3. Update `currentApp`, `currentAppId`, and `currentState` (`APP`).
+4. Create a `PhoneAppContext` scoped to the opened app.
 5. Clear `#AppContent`.
 6. Call `app.onOpen(ctx, cmd, evb)`.
 7. Call `app.build(ctx, cmd, evb)`.
+
+Navigating home or dismissing the device page also closes the active app and
+posts `DeviceAppCloseEvent`.
 
 ## Live-push methods
 
@@ -66,40 +70,43 @@ These are called externally by `CallRegistry` or `PhoneRegistry` and push UI upd
 
 Called when an incoming call arrives.
 
-1. If `cachedRef`/`cachedStore` are set (phone is open):
-   - Play ringtone sound.
-   - If an app is active: call `currentApp.onIncomingCall(ctx, ...)`, then rebuild the app UI.
-   - If no app is active: set state `INCOMING_CALL`, render incoming call prompt.
-2. Either way, push the update via `sendUpdate()`.
+1. Play the ringtone sound.
+2. If an app is active, call `currentApp.onIncomingCall(ctx, ...)` so it can
+   update state or perform side effects.
+3. Set state `INCOMING_CALL` and render the framework incoming-call overlay.
+4. Push the update via `sendUpdate()`.
 
 ### onCallAnswered(partnerNumber, partnerName)
 
 Called when the call connects.
 
-1. If an app is active: call `currentApp.onClose(ctx)`, then rebuild the app UI.
-2. If no app is active: set state `ACTIVE_CALL`, render active call screen.
+1. Set state `ACTIVE_CALL`.
+2. Render the active-call overlay.
 3. Push update.
 
 ### onCallEnded()
 
 Called when either party hangs up.
 
-1. If an app is active: call `currentApp.onClose(ctx)`, then rebuild the app UI.
-2. If no app is active and entity refs are cached: render calls screen, set state `CALLS`.
-3. If no app and no cached refs: fall back to home screen.
-4. Push update.
+1. Render the Calls screen.
+2. Set state `CALLS`.
+3. Push update.
+
+The session retains the current app while call overlays are shown. Navigating
+home, opening another app, or dismissing the page performs app closure.
 
 ### onIncomingMessage(fromNumber)
 
-Called when a text message arrives for this player.
+Called when a text message arrives while an app is the visible top-level state.
 
-1. If an app is active and entity refs are cached:
+1. If an app is visible and entity refs are cached:
    a. Call `currentApp.onIncomingMessage(ctx, fromNumber, cmd, evb)` (4-arg).
    b. If it returns `true` — send those builders directly. **No rebuild.** This is the dynamic-append fast path.
    c. If it returns `false` — call `currentApp.onIncomingMessage(ctx, fromNumber)` (2-arg), then call `build()` for a full rebuild.
 2. Push the update.
 
-If no app is active the method does nothing — apps that are not open do not receive real-time message updates.
+If no app is visible the method does nothing. In particular, background message
+updates do not replace call overlays or framework screens.
 
 ## Call state restoration sequence
 

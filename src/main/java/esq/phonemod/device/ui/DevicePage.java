@@ -50,7 +50,10 @@ import org.bson.BsonValue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -148,6 +151,8 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         super.onDismiss(ref, store);
+        session.updateStore(ref, store);
+        closeCurrentApp(ref, store);
         // Mark the phone UI as closed so we stop pushing to a dismissed page and a
         // re-open never orphans this one. Presence is kept so the player still gets
         // toasts while connected. Guarded by page identity to avoid wiping a page
@@ -173,9 +178,8 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
 
     @Override
     public void loadHomeState(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
+        closeCurrentApp(session.getRef(), session.getStore());
         session.setCurrentState(DevicePageState.HOME);
-        session.setCurrentApp(null);
-        session.setCurrentAppId(null);
         cmd.clear(session.getShell().getContentSelector());
         loadHome(cmd, evb);
     }
@@ -197,22 +201,25 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
     /**
      * Builds the home grid from the player's installed apps (Decision B).
      *
-     * <p>System apps are always shown first (in their registration order), followed
-     * by installed non-system apps. Hidden-permission apps are suppressed. The grid
-     * iterates the {@link DeviceInstalledAppsComponent} rather than the static
-     * {@code defaultApps} array so that the home screen reflects actual installs.
+     * <p>Compatible system apps are always shown first in device-asset declaration
+     * order, followed by compatible installed non-system apps sorted by
+     * {@link PhoneApp#getSortOrder()}. Hidden-permission apps are suppressed. The
+     * grid iterates the {@link DeviceInstalledAppsComponent} rather than only the
+     * static {@code defaultApps} array so that the home screen reflects actual
+     * installs.
      */
     private void buildAppMenu(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
         String holder = session.getShell().getHomeHolderSelector();
         cmd.clear(holder);
 
-        // Build ordered list: system apps first, then installed non-system apps.
-        java.util.List<String> appIds = new java.util.ArrayList<>();
+        // Build ordered list: system apps first, then sorted installed non-system apps.
+        List<String> appIds = new ArrayList<>();
+        List<String> installedAppIds = new ArrayList<>();
 
         // System apps — always present in device-asset declaration order.
         for (String appId : session.getShell().getDefaultApps()) {
             PhoneApp<?> app = PhoneService.get().getApp(appId);
-            if (app != null && app.isSystemApp()) {
+            if (app != null && app.isSystemApp() && supportsCurrentDevice(app)) {
                 appIds.add(appId);
             }
         }
@@ -227,11 +234,15 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
                     continue;
                 }
                 PhoneApp<?> app = PhoneService.get().getApp(appId);
-                if (app != null && !app.isSystemApp()) {
-                    appIds.add(appId);
+                if (app != null && !app.isSystemApp() && supportsCurrentDevice(app)) {
+                    installedAppIds.add(appId);
                 }
             }
         }
+        installedAppIds.sort(Comparator
+                .comparingInt((String appId) -> PhoneService.get().getApp(appId).getSortOrder())
+                .thenComparing(appId -> appId));
+        appIds.addAll(installedAppIds);
 
         int index = 0;
         UUID playerUuid = resolvePlayerUuid(session.getRef(), session.getStore());
@@ -280,6 +291,11 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             LOGGER.atWarning().log("[DevicePage] Unknown app: %s", appId);
             return null;
         }
+        if (!supportsCurrentDevice(app)) {
+            LOGGER.atWarning().log("[DevicePage] App %s does not support device type %s",
+                    appId, session.getShell().getDeviceType());
+            return null;
+        }
 
         // Decision C: re-verify permission at launch time (one check per open).
         String requiredNode = app.getRequiredPermission();
@@ -294,26 +310,23 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             }
         }
 
+        closeCurrentApp(ref, store);
+
+        session.setCurrentApp(app);
+        session.setCurrentAppId(appId);
+        session.setCurrentState(DevicePageState.APP);
+
         PhoneAppContext ctx = createContext(ref, store, appId);
         if (ctx == null) {
+            session.setCurrentApp(null);
+            session.setCurrentAppId(null);
+            session.setCurrentState(DevicePageState.HOME);
             return null;
         }
 
         // Inject device type so apps can filter the catalog without a session ref.
         ctx.setState(AppStoreApp.DEVICE_TYPE_STATE_KEY, session.getShell().getDeviceType());
 
-        PhoneApp<?> currentApp = session.getCurrentApp();
-        String previousAppId = session.getCurrentAppId();
-        if (currentApp != null) {
-            currentApp.onClose(ctx);
-            if (previousAppId != null) {
-                PhoneEvents.post(new DeviceAppCloseEvent(session, previousAppId));
-            }
-        }
-
-        session.setCurrentApp(app);
-        session.setCurrentAppId(appId);
-        session.setCurrentState(DevicePageState.APP);
         PhoneEvents.post(new DeviceAppOpenEvent(session, appId));
         cmd.clear(session.getShell().getContentSelector());
         app.onOpen(ctx, cmd, evb);
@@ -321,6 +334,38 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         ThemeService.apply(cmd, resolveThemeId(), session.getShell().getDefaultThemeId(),
                 app.getThemeableSelectors());
         return app;
+    }
+
+    private boolean supportsCurrentDevice(@Nonnull PhoneApp<?> app) {
+        String[] supported = app.getSupportedDeviceTypes();
+        if (supported == null || supported.length == 0) {
+            return true;
+        }
+        String deviceType = session.getShell().getDeviceType();
+        for (String type : supported) {
+            if (deviceType.equals(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void closeCurrentApp(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        PhoneApp<?> currentApp = session.getCurrentApp();
+        String currentAppId = session.getCurrentAppId();
+        if (currentApp == null || currentAppId == null) {
+            session.setCurrentApp(null);
+            session.setCurrentAppId(null);
+            return;
+        }
+
+        PhoneAppContext ctx = createContext(ref, store, currentAppId);
+        if (ctx != null) {
+            currentApp.onClose(ctx);
+        }
+        PhoneEvents.post(new DeviceAppCloseEvent(session, currentAppId));
+        session.setCurrentApp(null);
+        session.setCurrentAppId(null);
     }
 
     @Override
@@ -379,6 +424,9 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
 
     @Override
     public void onIncomingMessage(@Nonnull String fromNumber) {
+        if (session.getCurrentState() != DevicePageState.APP) {
+            return;
+        }
         PhoneApp<?> app = session.getCurrentApp();
         String appId = session.getCurrentAppId();
         if (app != null && appId != null) {
@@ -405,6 +453,14 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         playSound(session.getShell().getSoundProfile() != null
                 ? session.getShell().getSoundProfile().getRingtone()
                 : null);
+        PhoneApp<?> app = session.getCurrentApp();
+        String appId = session.getCurrentAppId();
+        if (app != null && appId != null) {
+            PhoneAppContext ctx = createContext(session.getRef(), session.getStore(), appId);
+            if (ctx != null) {
+                app.onIncomingCall(ctx, callerNumber, callerName);
+            }
+        }
         session.setCurrentState(DevicePageState.INCOMING_CALL);
         UICommandBuilder cmd = new UICommandBuilder();
         UIEventBuilder evb = new UIEventBuilder();
@@ -459,7 +515,8 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         // Generic sync re-render: repaint the app only if it is the one open right
         // now (the viewer may have navigated elsewhere since subscribing). Mirrors
         // openApp's clear -> build -> theme so the rebuild is clean and themed.
-        if (!appId.equals(session.getCurrentAppId())) {
+        if (session.getCurrentState() != DevicePageState.APP
+                || !appId.equals(session.getCurrentAppId())) {
             return;
         }
         PhoneApp<?> app = session.getCurrentApp();
@@ -553,4 +610,3 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
                 .build();
     }
 }
-

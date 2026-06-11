@@ -31,7 +31,10 @@ Asset path for the app's root UI file, loaded into `#AppContent` via `appendMain
 ```java
 void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb)
 ```
-Builds the current UI state for the given player. Called on initial open and after every event that returns `true` from `handleEvent`. Must be idempotent — rebuilding should produce the same result given the same state.
+Builds the current UI state for the given player. Called on initial open and by
+framework refresh paths. A handled `handleEvent` must populate the supplied
+builders, normally by calling `build(ctx, cmd, evb)` itself. Builds should be
+idempotent: rebuilding should produce the same result given the same state.
 
 ```java
 boolean handleEvent(PhoneAppContext ctx, PhoneEvent event,
@@ -44,7 +47,10 @@ Handles a player interaction. Return `true` if the event was consumed (the frame
 ```java
 default int getSortOrder()
 ```
-Controls display order in the home app grid. Lower values appear first. Default: `0`.
+Controls sorted registry/catalog views and the order of installed non-system apps
+in the home grid. Lower values appear first. System apps retain their
+`DefaultApps` declaration order. Equal sort values are ordered by app ID.
+Default: `0`.
 
 ```java
 default void onOpen(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb)
@@ -62,6 +68,9 @@ default boolean onIncomingMessage(PhoneAppContext ctx, String fromNumber,
 ```
 Called by `DevicePage` when a message arrives while this app is open. Return `true` to send `cmd`/`evb` as the UI update directly — no full rebuild. Return `false` to fall back to `build()`. Use the `true` path to append a single message bubble without clearing and re-rendering the whole chat.
 
+This hook only runs while the app is the visible top-level state; background
+message updates do not replace call overlays or framework screens.
+
 ```java
 default void onIncomingMessage(PhoneAppContext ctx, String fromNumber)
 ```
@@ -70,7 +79,16 @@ Fallback called by `DevicePage` only when the 4-arg overload returns `false`. `b
 ```java
 default void onIncomingCall(PhoneAppContext ctx, String callerNumber, String callerName)
 ```
-Called by `DevicePage` when an incoming call arrives while this app is open. `build()` is called automatically after this hook returns.
+Called by `DevicePage` when an incoming call arrives while this app is open.
+Use it to update app state or perform side effects before the framework replaces
+the content area with the incoming-call overlay. The app is not rebuilt.
+
+```java
+default String[] getSupportedDeviceTypes()
+```
+Returns supported device type IDs, such as `"phone"` or `"tablet"`. An empty
+array supports every device type. Incompatible apps are excluded from catalog
+and home-grid views and rejected if opened through a direct action.
 
 ---
 
@@ -137,7 +155,9 @@ The ID of the app this context was created for (matches `getId()`).
 
 ### Per-player state
 
-All values are `String`. Apps cannot read each other's state — keys are namespaced by `appId` inside `PhoneAppSessionState`.
+All values are `String`. State is namespaced by `deviceId + "|" + appId` inside
+`PhoneAppSessionState`, so apps and separate physical devices cannot read each
+other's state through the context API.
 
 ```java
 @Nullable String getState(String key)
@@ -152,7 +172,8 @@ Returns the stored value for `key`, or `defaultValue` if not set.
 ```java
 void setState(String key, String value)
 ```
-Stores `value` under `key`. Persists until the player's entity is unloaded.
+Stores `value` under `key`. Persists in the player's ECS component until
+explicitly cleared.
 
 ```java
 void clearState(String key)

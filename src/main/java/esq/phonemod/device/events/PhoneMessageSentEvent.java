@@ -3,7 +3,7 @@ package esq.phonemod.device.events;
 import javax.annotation.Nonnull;
 
 /**
- * Fired when a text message is sent from a device.
+ * Fired when the messaging registry accepts a text message from a sender.
  */
 public final class PhoneMessageSentEvent implements DeviceEvent {
 

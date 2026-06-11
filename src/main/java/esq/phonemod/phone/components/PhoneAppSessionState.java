@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Per-player session state for phone apps.
+ * Per-player persisted state for phone apps.
  *
  * Stores a map of {@code sessionKey → (key → value)} where each session key
  * is derived from the phone number and app ID. This ensures each physical
@@ -23,9 +23,9 @@ import java.util.Map;
  * ints, or enums should use {@link String#valueOf} / {@link Boolean#parseBoolean}
  * / {@link Integer#parseInt} / {@code Enum.valueOf}.
  *
- * <p>This component is registered with the ECS but its data is only meaningful
- * for the duration of the current play session — it resets naturally when the
- * player's entity is unloaded (logout / server restart).
+ * <p>This codec-backed ECS component is persisted when callers write it through
+ * {@code Store.putComponent}. State survives entity unloads and server restarts
+ * until an app explicitly clears it.
  */
 public class PhoneAppSessionState implements Component<EntityStore> {
 

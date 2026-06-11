@@ -100,7 +100,7 @@ public final class PhoneAppContext {
 
     private String getSessionKey() {
         String sessionKey = phoneNumber + "|" + appId;
-        LOGGER.atInfo().log("[PhoneAppContext] sessionKey=%s phone=%s app=%s", sessionKey, phoneNumber, appId);
+        LOGGER.atFine().log("[PhoneAppContext] sessionKey=%s phone=%s app=%s", sessionKey, phoneNumber, appId);
         return sessionKey;
     }
 
@@ -114,7 +114,7 @@ public final class PhoneAppContext {
     public String getState(@Nonnull String key) {
         PhoneAppSessionState s = store.ensureAndGetComponent(ref, PhoneAppSessionState.getComponentType());
         String value = s.get(getSessionKey(), key);
-        LOGGER.atInfo().log("[PhoneAppContext] getState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key,
+        LOGGER.atFine().log("[PhoneAppContext] getState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key,
                 value);
         return value;
     }
@@ -131,11 +131,11 @@ public final class PhoneAppContext {
 
     /**
      * Stores {@code value} under {@code key} in this app's state.
-     * The value persists until the player's entity is unloaded.
+     * The value persists in the player's ECS component until explicitly cleared.
      */
     public void setState(@Nonnull String key, @Nonnull String value) {
         PhoneAppSessionState s = store.ensureAndGetComponent(ref, PhoneAppSessionState.getComponentType());
-        LOGGER.atInfo().log("[PhoneAppContext] setState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key,
+        LOGGER.atFine().log("[PhoneAppContext] setState phone=%s app=%s key=%s value=%s", phoneNumber, appId, key,
                 value);
         s.set(getSessionKey(), key, value);
         store.putComponent(ref, PhoneAppSessionState.getComponentType(), s);
@@ -144,7 +144,7 @@ public final class PhoneAppContext {
     /** Removes {@code key} from this app's state. */
     public void clearState(@Nonnull String key) {
         PhoneAppSessionState s = store.ensureAndGetComponent(ref, PhoneAppSessionState.getComponentType());
-        LOGGER.atInfo().log("[PhoneAppContext] clearState phone=%s app=%s key=%s", phoneNumber, appId, key);
+        LOGGER.atFine().log("[PhoneAppContext] clearState phone=%s app=%s key=%s", phoneNumber, appId, key);
         s.remove(getSessionKey(), key);
         store.putComponent(ref, PhoneAppSessionState.getComponentType(), s);
     }
@@ -152,7 +152,7 @@ public final class PhoneAppContext {
     /** Removes all state keys for this app. */
     public void clearAllState() {
         PhoneAppSessionState s = store.ensureAndGetComponent(ref, PhoneAppSessionState.getComponentType());
-        LOGGER.atInfo().log("[PhoneAppContext] clearAllState phone=%s app=%s", phoneNumber, appId);
+        LOGGER.atFine().log("[PhoneAppContext] clearAllState phone=%s app=%s", phoneNumber, appId);
         s.clearApp(getSessionKey());
         store.putComponent(ref, PhoneAppSessionState.getComponentType(), s);
     }

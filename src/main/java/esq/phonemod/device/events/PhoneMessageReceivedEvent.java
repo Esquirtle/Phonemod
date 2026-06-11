@@ -3,7 +3,8 @@ package esq.phonemod.device.events;
 import javax.annotation.Nonnull;
 
 /**
- * Fired when a text message is received by a device.
+ * Fired when the messaging registry accepts a text message for a destination
+ * device, before live delivery, persistence, or offline queueing.
  */
 public final class PhoneMessageReceivedEvent implements DeviceEvent {
 
