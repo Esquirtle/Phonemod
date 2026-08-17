@@ -21,8 +21,6 @@ public final class Whatgram {
 
     /** One conversation-list row. */
     public static final String ENTRY_UI  = "Pages/Phone/Components/DustWhatgramConvEntry.ui";
-    /** Empty-state card shown when there are no conversations yet. */
-    public static final String EMPTY_UI  = "Pages/Phone/Components/DustWhatgramEmpty.ui";
     /** One chat message bubble. */
     public static final String BUBBLE_UI = "Pages/Phone/Components/DustWhatgramBubble.ui";
 
@@ -55,10 +53,6 @@ public final class Whatgram {
     // Conversation-row children (relative to an appended ENTRY_UI row).
     /** Relative: name label inside a conversation row. */
     public static final String SEL_ENTRY_NAME_TEXT = "#Name.Text";
-    /** Relative: last-message preview label inside a conversation row. */
-    public static final String SEL_ENTRY_PREVIEW_TEXT = "#Preview.Text";
-    /** Relative: relative-timestamp label inside a conversation row. */
-    public static final String SEL_ENTRY_TIME_TEXT = "#Time.Text";
     /** Relative: open-chat button inside a conversation row. */
     public static final String SEL_ENTRY_BUTTON    = "#Button";
 

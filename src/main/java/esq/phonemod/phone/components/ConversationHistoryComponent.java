@@ -127,19 +127,6 @@ public final class ConversationHistoryComponent implements Component<EntityStore
     }
 
     /**
-     * Returns the most recent message between {@code ownNumber} and {@code contactNumber},
-     * or {@code null} if the conversation has no messages. Used by the conversation list to
-     * render a last-message preview and relative timestamp.
-     */
-    @javax.annotation.Nullable
-    public ChatMessage getLastMessage(@Nonnull String ownNumber, @Nonnull String contactNumber) {
-        Map<String, ChatMessage[]> contacts = history.get(ownNumber);
-        if (contacts == null) return null;
-        ChatMessage[] msgs = contacts.get(contactNumber);
-        return msgs != null && msgs.length > 0 ? msgs[msgs.length - 1] : null;
-    }
-
-    /**
      * Returns all contacts that have at least one message for the given owning phone number.
      */
     @Nonnull
