@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import esq.phonemod.operations.OperationalMetrics;
 import java.util.function.Consumer;
 
 /**
@@ -31,6 +33,7 @@ public final class SyncService {
 
     private static final Map<String, SyncChannelType<?>> TYPES = new ConcurrentHashMap<>();
     private static final Map<String, SyncChannel<?>> CHANNELS = new ConcurrentHashMap<>();
+    private static final AtomicInteger PENDING_SAVES = new AtomicInteger();
 
     @Nullable
     private static volatile ChannelStore store;
@@ -160,11 +163,24 @@ public final class SyncService {
         if (s == null) {
             return;
         }
-        String hash = s.save(channel);
-        if (hash != null) {
-            channel.setSavedHash(hash);
+        var future = s.save(channel);
+        if (future != null) {
+            PENDING_SAVES.incrementAndGet();
+            future.whenComplete((result, error) -> {
+                PENDING_SAVES.decrementAndGet();
+                if (error != null) {
+                    OperationalMetrics.get().saveFailure();
+                    LOGGER.atWarning().withCause(error).log(
+                            "[SyncService] Save failed channel=%s/%s",
+                            channel.type().typeId(), channel.id());
+                    return;
+                }
+                channel.markSaved(result.sequence(), result.hash());
+            });
         }
     }
+
+    public static int pendingSaves() { return PENDING_SAVES.get(); }
 
     /** Re-renders the bound app for every subscriber whose phone is currently open. */
     public static void broadcast(@Nonnull SyncChannel<?> channel) {

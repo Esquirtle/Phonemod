@@ -57,26 +57,28 @@ final class AppsCommand extends AbstractPlayerCommand {
         }
 
         // We need an ECS store reference for the target; retrieve it from their first online entry.
-        PhoneRegistry.OnlineEntry entry = PhoneRegistry.getOnlineEntry(devices.get(0));
+        PhoneRegistry.PresenceEntry entry = PhoneRegistry.getPresenceEntry(devices.get(0));
         if (entry == null) {
             context.sendMessage(Message.translation("phonemod.permissions.apps.noDevices")
                     .insert(targetName));
             return;
         }
 
-        context.sendMessage(Message.translation("phonemod.permissions.apps.header")
-                .insert(targetName));
-        for (String deviceId : devices) {
-            DeviceInstalledAppsComponent comp = entry.store().getComponent(
-                    entry.ref(), DeviceInstalledAppsComponent.getComponentType());
-            Set<String> installed = comp != null ? comp.getInstalled(deviceId)
-                    : Collections.emptySet();
-            String appList = installed.stream()
-                    .filter(id -> !"__seeded__".equals(id))
-                    .sorted()
-                    .collect(Collectors.joining(", "));
-            context.sendMessage(Message.raw("  " + deviceId + ": "
-                    + (appList.isEmpty() ? "(none)" : appList)));
-        }
+        entry.world().execute(() -> {
+            if (!entry.ref().isValid()) return;
+            context.sendMessage(Message.translation("phonemod.permissions.apps.header")
+                    .insert(targetName));
+            for (String deviceId : devices) {
+                DeviceInstalledAppsComponent comp = entry.store().getComponent(
+                        entry.ref(), DeviceInstalledAppsComponent.getComponentType());
+                Set<String> installed = comp != null ? comp.getInstalled(deviceId)
+                        : Collections.emptySet();
+                String appList = installed.stream()
+                        .filter(id -> !"__seeded__".equals(id))
+                        .sorted().collect(Collectors.joining(", "));
+                context.sendMessage(Message.raw("  " + deviceId + ": "
+                        + (appList.isEmpty() ? "(none)" : appList)));
+            }
+        });
     }
 }

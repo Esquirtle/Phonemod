@@ -10,6 +10,7 @@ import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
@@ -18,7 +19,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import esq.permission.api.AppPermissionService;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import esq.phonemod.device.api.DevicePageHandle;
 import esq.phonemod.device.components.DeviceSettings;
 import esq.phonemod.device.components.DeviceSettingsComponent;
@@ -45,8 +46,13 @@ import esq.phonemod.phone.appstore.DeviceInstalledAppsComponent;
 import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.CallRegistry;
 import esq.phonemod.phone.messaging.PhoneRegistry;
-import org.bson.BsonDocument;
-import org.bson.BsonValue;
+import esq.phonemod.PhoneMod;
+import esq.phonemod.security.UiEventDecoder;
+import esq.phonemod.security.UiEventValidator;
+import esq.phonemod.operations.OperationalMetrics;
+import esq.phonemod.platform.RuntimeDevicePlatform;
+import esq.phonemod.api.DeviceIdentity;
+import esq.phonemod.api.event.AppOpenEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -74,6 +80,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
     private static final PhoneRouter ROUTER = DefaultPhoneRouter.createDefault();
 
     private final DeviceSession session;
+    private volatile boolean active = true;
 
     public DevicePage(@Nonnull DeviceSession session) {
         super(session.getPlayerRef(), CustomPageLifetime.CanDismiss, DeviceEventData.CODEC);
@@ -93,7 +100,18 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             @Nonnull UIEventBuilder evb,
             @Nonnull Store<EntityStore> store) {
         session.updateStore(ref, store);
+        DeviceIdentity identity = resolveIdentity();
+        if (identity != null) {
+            var pre = HytaleServer.get().getEventBus().dispatchFor(esq.phonemod.api.event.DeviceOpenEvent.Pre.class)
+                    .dispatch(new esq.phonemod.api.event.DeviceOpenEvent.Pre(
+                            session.getPlayerRef().getUuid(), identity));
+            if (pre.isCancelled()) return;
+        }
         PhoneEvents.post(new DeviceOpenEvent(session));
+        if (identity != null) HytaleServer.get().getEventBus()
+                .dispatchFor(esq.phonemod.api.event.DeviceOpenEvent.Post.class)
+                .dispatch(new esq.phonemod.api.event.DeviceOpenEvent.Post(
+                        session.getPlayerRef().getUuid(), identity));
         cmd.append(session.getShell().getShellUiPath());
         ThemeService.applyShell(cmd, session.getShell(), resolveThemeId());
 
@@ -112,7 +130,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             evb.addEventBinding(CustomUIEventBindingType.Activating,
                     homeButton,
                     EventData.of("Action", PhoneEventActions.HOME),
-                    false);
+                    true);
         }
 
         if (session.getShell().hasCapability("calls")) {
@@ -122,12 +140,14 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             String content = session.getShell().getContentSelector();
             if (activePartner != null) {
                 session.setCurrentState(DevicePageState.ACTIVE_CALL);
-                Calls.loadActiveCallState(activePartner, activePartner, content, cmd, evb);
+                Calls.loadActiveCallState(session.getDeviceId(), activePartner,
+                        activePartner, content, cmd, evb);
                 return;
             }
             if (pendingCallee != null) {
                 session.setCurrentState(DevicePageState.ACTIVE_CALL);
-                Calls.loadActiveCallState(pendingCallee, "Calling...", content, cmd, evb);
+                Calls.loadActiveCallState(session.getDeviceId(), pendingCallee,
+                        "Calling...", content, cmd, evb);
                 return;
             }
             if (pendingCaller != null) {
@@ -145,12 +165,48 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             @Nonnull Store<EntityStore> store,
             String rawData) {
         session.updateStore(ref, store);
-        handleEventMap(ref, store, decodeEventMap(rawData));
+        try {
+            if (!isAuthorizedSession(ref, store)) {
+                rejectAction("session_not_authorized");
+                return;
+            }
+            if (!session.tryAcquireAction()) {
+                rejectAction("rate_limited");
+                return;
+            }
+            UiEventValidator.ValidationResult rawResult =
+                    UiEventValidator.validateRaw(rawData, PhoneMod.config());
+            if (!rawResult.allowed()) {
+                rejectAction(rawResult.reason());
+                return;
+            }
+            Map<String, String> event = UiEventDecoder.decode(rawData);
+            UiEventValidator.ValidationResult fieldResult =
+                    UiEventValidator.validateFields(event, PhoneMod.config());
+            if (!fieldResult.allowed()) {
+                rejectAction(fieldResult.reason());
+                return;
+            }
+            String suppliedApp = event.get("App");
+            if (suppliedApp != null && !PhoneEventActions.OPEN_APP.equals(event.get("Action"))
+                    && session.getCurrentAppId() != null
+                    && !session.getCurrentAppId().equals(suppliedApp)) {
+                rejectAction("stale_app_state");
+                return;
+            }
+            handleEventMap(ref, store, event);
+        } catch (RuntimeException error) {
+            LOGGER.atWarning().log(
+                    "[DevicePage] Rejected malformed UI event device=%s reason=%s",
+                    session.getDeviceId(), error.getMessage());
+            sendUpdate(null, null, false);
+        }
     }
 
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         super.onDismiss(ref, store);
+        active = false;
         session.updateStore(ref, store);
         closeCurrentApp(ref, store);
         // Mark the phone UI as closed so we stop pushing to a dismissed page and a
@@ -158,6 +214,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         // toasts while connected. Guarded by page identity to avoid wiping a page
         // that already replaced this one.
         PhoneRegistry.unregisterPage(session.getDeviceId(), this);
+        session.setPageHandle(null);
         // Notify listeners (e.g. the sync layer drops this phone's subscriptions)
         // that the device page is gone.
         PhoneEvents.post(new DeviceCloseEvent(session));
@@ -192,9 +249,15 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
      * bar is not touched: it lives outside the content area and is persistent.
      */
     private void loadHome(@Nonnull UICommandBuilder cmd, @Nonnull UIEventBuilder evb) {
+        DeviceSettings settings = resolveDeviceSettings();
+        String layoutMode = settings != null && "List".equals(settings.getAppLayout())
+                ? "TopScrolling" : "LeftCenterWrap";
+        cmd.set(session.getShell().getContentSelector() + ".Background",
+                resolveWallpaper(settings));
         cmd.appendInline(session.getShell().getContentSelector(),
                 "Group " + session.getShell().getHomeHolderSelector()
-                        + " { FlexWeight: 1; Padding: (Full: 8); LayoutMode: LeftCenterWrap; }");
+                        + " { FlexWeight: 1; Padding: (Full: 8); LayoutMode: "
+                        + layoutMode + "; }");
         buildAppMenu(cmd, evb);
     }
 
@@ -256,7 +319,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             String requiredNode = app.getRequiredPermission();
             if (requiredNode != null && "hidden".equals(app.getPermissionVisibility())
                     && playerUuid != null
-                    && !AppPermissionService.get().hasPermission(playerUuid, requiredNode)) {
+                    && !PermissionsModule.get().hasPermission(playerUuid, requiredNode)) {
                 continue;
             }
             String buttonUI = app.getAppButtonUI();
@@ -271,7 +334,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             evb.addEventBinding(CustomUIEventBindingType.Activating,
                     entrySelector + " #APPBUTTON",
                     EventData.of("Action", PhoneEventActions.OPEN_APP).append("App", app.getId()),
-                    false);
+                    true);
             index++;
         }
     }
@@ -296,12 +359,22 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
                     appId, session.getShell().getDeviceType());
             return null;
         }
+        if (!isAuthorizedSession(ref, store)) {
+            LOGGER.atWarning().log("[DevicePage] Unauthorized app open device=%s app=%s",
+                    session.getDeviceId(), appId);
+            return null;
+        }
+        if (!AppInstallService.get().isInstalled(ref, store, session.getDeviceId(), appId)) {
+            LOGGER.atWarning().log("[DevicePage] App is not installed device=%s app=%s",
+                    session.getDeviceId(), appId);
+            return null;
+        }
 
         // Decision C: re-verify permission at launch time (one check per open).
         String requiredNode = app.getRequiredPermission();
         if (requiredNode != null) {
             UUID playerUuid = resolvePlayerUuid(ref, store);
-            if (playerUuid == null || !AppPermissionService.get().hasPermission(playerUuid, requiredNode)) {
+            if (playerUuid == null || !PermissionsModule.get().hasPermission(playerUuid, requiredNode)) {
                 PlayerRef pr = store.getComponent(ref, PlayerRef.getComponentType());
                 if (pr != null) {
                     pr.sendMessage(Message.translation("phonemod.appstore.launch.denied"));
@@ -309,6 +382,12 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
                 return null;
             }
         }
+
+        UUID openingPlayer = resolvePlayerUuid(ref, store);
+        if (openingPlayer == null) return null;
+        AppOpenEvent.Pre pre = HytaleServer.get().getEventBus().dispatchFor(AppOpenEvent.Pre.class)
+                .dispatch(new AppOpenEvent.Pre(openingPlayer, session.getDeviceId(), appId));
+        if (pre.isCancelled()) return null;
 
         closeCurrentApp(ref, store);
 
@@ -332,7 +411,11 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         app.onOpen(ctx, cmd, evb);
         app.build(ctx, cmd, evb);
         ThemeService.apply(cmd, resolveThemeId(), session.getShell().getDefaultThemeId(),
+                Map.of("appContent", session.getShell().getContentSelector()));
+        ThemeService.apply(cmd, resolveThemeId(), session.getShell().getDefaultThemeId(),
                 app.getThemeableSelectors());
+        HytaleServer.get().getEventBus().dispatchFor(AppOpenEvent.Post.class)
+                .dispatch(new AppOpenEvent.Post(openingPlayer, session.getDeviceId(), appId));
         return app;
     }
 
@@ -407,19 +490,30 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         return key.startsWith("@") ? key.substring(1) : key;
     }
 
-    @Nonnull
-    private static Map<String, String> decodeEventMap(@Nonnull String rawData) {
-        Map<String, String> result = new HashMap<>();
-        BsonDocument document = BsonDocument.parse(rawData);
-        for (Map.Entry<String, BsonValue> entry : document.entrySet()) {
-            BsonValue value = entry.getValue();
-            if (value == null || value.isNull()) {
-                continue;
-            }
-            result.put(normalizeKey(entry.getKey()),
-                    value.isString() ? value.asString().getValue() : value.toString());
-        }
-        return result;
+    private boolean isAuthorizedSession(@Nonnull Ref<EntityStore> ref,
+                                        @Nonnull Store<EntityStore> store) {
+        UUID playerUuid = resolvePlayerUuid(ref, store);
+        if (!active || playerUuid == null || !session.isOwnedBy(playerUuid)) return false;
+        PhoneRegistry.OnlineEntry current = PhoneRegistry.getOnlineEntry(session.getDeviceId());
+        return current == null || PhoneRegistry.isAuthorizedPage(session.getDeviceId(), ref, this);
+    }
+
+    @Nullable
+    private DeviceIdentity resolveIdentity() {
+        var identities = RuntimeDevicePlatform.get().identities();
+        try {
+            var byId = identities.find(UUID.fromString(session.getDeviceId()));
+            if (byId.isPresent()) return byId.get();
+        } catch (IllegalArgumentException ignored) {}
+        return identities.findAddress(session.getDeviceId()).orElse(null);
+    }
+
+    private void rejectAction(@Nonnull String reason) {
+        OperationalMetrics.get().rejectedAction();
+        if ("rate_limited".equals(reason)) OperationalMetrics.get().rateLimited();
+        LOGGER.atWarning().log("[DevicePage] Rejected UI action device=%s reason=%s",
+                session.getDeviceId(), reason);
+        sendUpdate(null, null, false);
     }
 
     @Override
@@ -450,7 +544,9 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         if (!session.getShell().hasCapability("calls")) {
             return;
         }
-        playSound(session.getShell().getSoundProfile() != null
+        DeviceSettings settings = resolveDeviceSettings();
+        playSound(settings != null && "Silent".equals(settings.getSoundProfileId())
+                ? null : session.getShell().getSoundProfile() != null
                 ? session.getShell().getSoundProfile().getRingtone()
                 : null);
         PhoneApp<?> app = session.getCurrentApp();
@@ -479,7 +575,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         UIEventBuilder evb = new UIEventBuilder();
         // Reuse the active-call overlay with a "Calling…" label until the callee answers;
         // this matches what build() shows for a pending outgoing call on reopen.
-        Calls.loadActiveCallState(calleeNumber, "Calling… " + calleeName,
+        Calls.loadActiveCallState(session.getDeviceId(), calleeNumber, "Calling… " + calleeName,
                 session.getShell().getContentSelector(), cmd, evb);
         sendUpdate(cmd, evb, false);
     }
@@ -492,7 +588,7 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         session.setCurrentState(DevicePageState.ACTIVE_CALL);
         UICommandBuilder cmd = new UICommandBuilder();
         UIEventBuilder evb = new UIEventBuilder();
-        Calls.loadActiveCallState(partnerNumber, partnerName,
+        Calls.loadActiveCallState(session.getDeviceId(), partnerNumber, partnerName,
                 session.getShell().getContentSelector(), cmd, evb);
         sendUpdate(cmd, evb, false);
     }
@@ -532,6 +628,8 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
         cmd.clear(session.getShell().getContentSelector());
         app.build(ctx, cmd, evb);
         ThemeService.apply(cmd, resolveThemeId(), session.getShell().getDefaultThemeId(),
+                Map.of("appContent", session.getShell().getContentSelector()));
+        ThemeService.apply(cmd, resolveThemeId(), session.getShell().getDefaultThemeId(),
                 app.getThemeableSelectors());
         sendUpdate(cmd, evb, false);
     }
@@ -542,23 +640,38 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
      */
     @Nullable
     private String resolveThemeId() {
-        var type = DeviceSettingsComponent.getComponentType();
-        if (type != null) {
-            DeviceSettingsComponent component = session.getStore().getComponent(session.getRef(), type);
-            if (component != null) {
-                DeviceSettings settings = component.get(session.getDeviceId());
-                if (settings != null && settings.getThemeId() != null && !settings.getThemeId().isBlank()) {
-                    return settings.getThemeId();
-                }
-            }
+        DeviceSettings settings = resolveDeviceSettings();
+        if (settings != null && settings.getThemeId() != null
+                && !settings.getThemeId().isBlank()) {
+            return settings.getThemeId();
         }
         return session.getShell().getDefaultThemeId();
+    }
+
+    @Nullable
+    private DeviceSettings resolveDeviceSettings() {
+        var type = DeviceSettingsComponent.getComponentType();
+        if (type == null) return null;
+        DeviceSettingsComponent component =
+                session.getStore().getComponent(session.getRef(), type);
+        return component != null ? component.get(session.getDeviceId()) : null;
+    }
+
+    @Nonnull
+    private String resolveWallpaper(@Nullable DeviceSettings settings) {
+        String wallpaper = settings != null ? settings.getWallpaper() : null;
+        if ("Dark".equals(wallpaper)) return "#0f1724";
+        if ("None".equals(wallpaper)) return "#151c26";
+        String assetDefault = session.getShell().getDefaultWallpaper();
+        return assetDefault != null && !assetDefault.isBlank() ? assetDefault : "#151c26";
     }
 
     @Override
     public void reapplyTheme(@Nonnull String themeId) {
         UICommandBuilder cmd = new UICommandBuilder();
         ThemeService.applyShell(cmd, session.getShell(), themeId);
+        ThemeService.apply(cmd, themeId, session.getShell().getDefaultThemeId(),
+                Map.of("appContent", session.getShell().getContentSelector()));
         PhoneApp<?> app = session.getCurrentApp();
         if (app != null) {
             ThemeService.apply(cmd, themeId, session.getShell().getDefaultThemeId(),

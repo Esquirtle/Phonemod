@@ -1,0 +1,38 @@
+// One App Store row, appended into #AppStoreList.
+// App sets:  #StoreName.Text / #StoreId.Text
+//            optional #StoreIcon.Background (real icon overlay)
+//            #ActionButton.Text (Install / Uninstall / Open)
+//            #ActionButton.Visible (false for restricted)
+//            #LockedBadge.Visible (true for restricted)
+$D = "../../DustLib.ui";
+
+$D.@DustShellListEntry #AppStoreEntry {
+  Anchor: (Height: $D.@DustShellListEntryHeight, Bottom: 6);
+
+  // Icon tile — placeholder Dust colour; the app overlays the real icon if any.
+  Group #StoreIcon {
+    Anchor: (Width: 40, Height: 40, Right: 12);
+    Background: $D.@DustAppButtonBackground;
+  }
+
+  Group #StoreText {
+    FlexWeight: 1;
+    LayoutMode: Top;
+    Label #StoreName { Text: "App"; Style: (FontSize: 14, RenderBold: true, TextColor: $D.@DustTextPrimary); }
+    Label #StoreId   { Text: "id";  Style: (FontSize: 11, TextColor: $D.@DustTextSecondary); }
+  }
+
+  // Lock badge — shown for restricted (locked) apps; hidden by default.
+  Label #LockedBadge {
+    Visible: false;
+    Anchor: (Width: 24, Height: 24, Right: 8);
+    Text: "🔒";
+    Style: (FontSize: 16, TextColor: $D.@DustTextSecondary);
+  }
+
+  // Action button — text is set by AppStoreApp per tab/context.
+  $D.@DustShellActionButton #ActionButton {
+    Anchor: (Width: 72, Height: 36);
+    Text: "Action";
+  }
+}

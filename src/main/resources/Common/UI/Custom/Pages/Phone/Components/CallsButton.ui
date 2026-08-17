@@ -1,0 +1,6 @@
+// Calls app-grid button. Structure/style from DustLib; only the icon differs.
+// NOTE: @Icon is consumed inside DustLib.ui, so its path is relative to that
+// file's folder (Pages/), NOT this file. Hence "Phone/..", not "../..".
+$D = "../../DustLib.ui";
+
+$D.@PhoneAppButton #APPBUTTONENTRY { @Icon = "Phone/Calls.png"; }

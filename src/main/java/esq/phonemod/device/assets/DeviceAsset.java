@@ -9,6 +9,7 @@ import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
+import com.hypixel.hytale.codec.codecs.EnumCodec;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -87,6 +88,10 @@ public final class DeviceAsset implements JsonAssetWithMap<String, DefaultAssetM
                     (asset, value) -> asset.soundProfile = value,
                     asset -> asset.soundProfile)
             .add()
+            .append(new KeyedCodec<>("CallAudioPolicy", new EnumCodec<>(CallAudioPolicy.class)),
+                    (asset, value) -> asset.callAudioPolicy = value,
+                    asset -> asset.callAudioPolicy)
+            .add()
             .append(new KeyedCodec<>("Selectors",
                             new MapCodec<>(Codec.STRING, HashMap::new, false)),
                     (asset, value) -> asset.selectors = value,
@@ -111,6 +116,7 @@ public final class DeviceAsset implements JsonAssetWithMap<String, DefaultAssetM
     private String defaultWallpaper;
     private String defaultIconPack;
     private DeviceSoundProfile soundProfile;
+    private CallAudioPolicy callAudioPolicy = CallAudioPolicy.PRIVATE;
     private Map<String, String> selectors = Collections.emptyMap();
 
     @Nonnull
@@ -204,6 +210,11 @@ public final class DeviceAsset implements JsonAssetWithMap<String, DefaultAssetM
     @Nullable
     public DeviceSoundProfile getSoundProfile() {
         return soundProfile;
+    }
+
+    @Nonnull
+    public CallAudioPolicy getCallAudioPolicy() {
+        return callAudioPolicy != null ? callAudioPolicy : CallAudioPolicy.PRIVATE;
     }
 
     @Nonnull

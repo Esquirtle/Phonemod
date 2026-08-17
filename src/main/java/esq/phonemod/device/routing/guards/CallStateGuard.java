@@ -11,10 +11,8 @@ import javax.annotation.Nonnull;
  * (e.g. {@link DevicePageState#ACTIVE_CALL} or {@link DevicePageState#INCOMING_CALL}).
  *
  * <p>Reuses the existing {@code DevicePageState} enum rather than introducing a
- * parallel call-state type. Provided for new routes; it is intentionally
- * <em>not</em> attached to the built-in answer/decline/hang-up routes, because
- * the legacy code did not pre-check call state (it delegates the "no active
- * call" case to {@code CallRegistry}). Attaching it there would change behavior.
+ * parallel UI state type. Server routes attach this guard to reject stale or
+ * forged call controls before they reach the call state machine.
  */
 public final class CallStateGuard implements RouteGuard {
 

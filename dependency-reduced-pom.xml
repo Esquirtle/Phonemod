@@ -13,6 +13,11 @@
     <plugins>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <java.util.logging.manager>com.hypixel.hytale.logger.backend.HytaleLogManager</java.util.logging.manager>
+          </systemPropertyVariables>
+        </configuration>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
@@ -82,6 +87,26 @@
   </profiles>
   <dependencies>
     <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.12.2</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>junit-jupiter-api</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit-jupiter-params</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit-jupiter-engine</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>com.hytale</groupId>
       <artifactId>hytale-server</artifactId>
       <version>LOCAL</version>
@@ -91,7 +116,8 @@
   </dependencies>
   <properties>
     <hytale.patchline>pre-release</hytale.patchline>
-    <hytale.install-dir>/home/ed/hytale/WORKSPACE/dev/HytaleServer.jar</hytale.install-dir>
+    <junit.version>5.12.2</junit.version>
+    <hytale.install-dir>${project.basedir}/../HytaleServer.jar</hytale.install-dir>
     <phonemod.assets.dir>C:\Users\ed\IdeaProjects\Phonemod-Assets</phonemod.assets.dir>
   </properties>
 </project>

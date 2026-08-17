@@ -1,4 +1,7 @@
-# Creating a Phone App
+# Creating a Phone App (legacy v1)
+
+New apps should follow [V2_APP_TUTORIAL.md](V2_APP_TUTORIAL.md). This guide remains for the
+2.x compatibility bridge.
 
 ## Step 1: Declare a dependency on the phone framework
 

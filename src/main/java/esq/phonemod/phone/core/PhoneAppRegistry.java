@@ -22,29 +22,46 @@ public final class PhoneAppRegistry {
      *
      * @throws IllegalArgumentException if an app with the same ID is already registered
      */
-    public void register(@Nonnull PhoneApp<?> app) {
+    public synchronized void register(@Nonnull PhoneApp<?> app) {
+        register(app, java.util.Set.of());
+    }
+
+    public synchronized void register(@Nonnull PhoneApp<?> app, @Nonnull java.util.Set<String> aliases) {
         String appId = app.getId();
         if (apps.containsKey(appId)) {
             throw new IllegalArgumentException("Phone app already registered: " + appId);
         }
+        for (String alias : aliases) {
+            if (apps.containsKey(alias)) throw new IllegalArgumentException("Phone app alias already registered: " + alias);
+        }
         apps.put(appId, app);
+        for (String alias : aliases) apps.put(alias, app);
+    }
+
+    /**
+     * Reverses {@link #register}. No-op if no app with that id is registered. Host plugins call
+     * this on shutdown so a disable→enable (/reload) does not leave stale app instances behind.
+     */
+    public synchronized void unregister(@Nonnull String appId) {
+        PhoneApp<?> removed = apps.get(appId);
+        if (removed != null) apps.values().removeIf(app -> app == removed);
     }
 
     @Nonnull
-    public PhoneApp<?> get(@Nonnull String appId) {
+    public synchronized PhoneApp<?> get(@Nonnull String appId) {
         return apps.get(appId);
     }
 
     @Nonnull
-    public List<PhoneApp<?>> getApps() {
-        List<PhoneApp<?>> sorted = new ArrayList<>(apps.values());
+    public synchronized List<PhoneApp<?>> getApps() {
+        List<PhoneApp<?>> sorted = new ArrayList<>(new java.util.LinkedHashSet<>(apps.values()));
         sorted.sort(Comparator
                 .comparingInt((PhoneApp<?> app) -> app.getSortOrder())
                 .thenComparing(PhoneApp::getId));
         return Collections.unmodifiableList(sorted);
     }
 
-    public boolean contains(@Nonnull String appId) {
+    public synchronized boolean contains(@Nonnull String appId) {
         return apps.containsKey(appId);
     }
 }

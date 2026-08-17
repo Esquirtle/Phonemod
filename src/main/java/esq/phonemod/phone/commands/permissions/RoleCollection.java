@@ -6,7 +6,7 @@ import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredAr
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
-import esq.permission.service.RoleService;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 
 import javax.annotation.Nonnull;
 import java.util.Set;
@@ -56,7 +56,7 @@ final class RoleCollection extends AbstractCommandCollection {
             if (uuid == null) {
                 return;
             }
-            RoleService.get().grantRole(uuid, role);
+            PermissionsModule.get().addUserToGroup(uuid, role);
             context.sendMessage(Message.translation("phonemod.permissions.role.grant.success")
                     .insert(role).insert(playerInput));
         }
@@ -82,7 +82,7 @@ final class RoleCollection extends AbstractCommandCollection {
             if (uuid == null) {
                 return;
             }
-            RoleService.get().revokeRole(uuid, role);
+            PermissionsModule.get().removeUserFromGroup(uuid, role);
             context.sendMessage(Message.translation("phonemod.permissions.role.revoke.success")
                     .insert(role).insert(playerInput));
         }
@@ -97,7 +97,7 @@ final class RoleCollection extends AbstractCommandCollection {
 
         @Override
         protected void executeSync(@Nonnull CommandContext context) {
-            Set<String> roles = RoleService.get().getKnownRoles();
+            Set<String> roles = PermissionsModule.get().getAllRegisteredGroups();
             context.sendMessage(Message.translation("phonemod.permissions.role.list.header"));
             if (roles.isEmpty()) {
                 context.sendMessage(Message.translation("phonemod.permissions.none"));
@@ -146,7 +146,7 @@ final class RoleCollection extends AbstractCommandCollection {
         protected void executeSync(@Nonnull CommandContext context) {
             String role = roleArg.get(context);
             String node = nodeArg.get(context);
-            RoleService.get().addRolePermission(role, node);
+            PermissionsModule.get().addGroupPermission(role, Set.of(node));
             context.sendMessage(Message.translation("phonemod.permissions.role.addperm.success")
                     .insert(node).insert(role));
         }
@@ -168,7 +168,7 @@ final class RoleCollection extends AbstractCommandCollection {
         protected void executeSync(@Nonnull CommandContext context) {
             String role = roleArg.get(context);
             String node = nodeArg.get(context);
-            RoleService.get().removeRolePermission(role, node);
+            PermissionsModule.get().removeGroupPermission(role, Set.of(node));
             context.sendMessage(Message.translation("phonemod.permissions.role.removeperm.success")
                     .insert(node).insert(role));
         }

@@ -1,9 +1,6 @@
 package esq.phonemod.phone.appstore;
 
-import esq.permission.api.AppPermissionRequirement;
-import esq.permission.api.AppPermissionService;
-import esq.permission.api.PermissionResult;
-import esq.permission.api.PermissionVisibility;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import esq.phonemod.phone.api.PhoneApp;
 import esq.phonemod.phone.core.PhoneService;
 
@@ -23,8 +20,8 @@ import java.util.UUID;
  *   <li><b>AVAILABLE</b> — apps the player can install (permission check passes,
  *       not yet installed)</li>
  *   <li><b>RESTRICTED</b> — apps the player lacks permission for and whose
- *       visibility is {@link PermissionVisibility#LOCKED} (visible but gated);
- *       apps whose visibility is {@link PermissionVisibility#HIDDEN} are excluded
+ *       visibility is {@code locked} (visible but gated);
+ *       apps whose visibility is {@code hidden} are excluded
  *       from all buckets</li>
  * </ul>
  */
@@ -113,7 +110,7 @@ public final class AppCatalogService {
                 continue;
             }
             String node = app.getRequiredPermission();
-            if (node == null || AppPermissionService.get().hasPermission(playerUuid, node)) {
+            if (node == null || PermissionsModule.get().hasPermission(playerUuid, node)) {
                 result.add(app);
             }
         }
@@ -122,7 +119,7 @@ public final class AppCatalogService {
 
     /**
      * Returns apps the player cannot install because they lack the required
-     * permission and the visibility is {@link PermissionVisibility#LOCKED}
+     * permission and the visibility is {@code locked}
      * (hidden apps are excluded entirely).
      */
     @Nonnull
@@ -141,10 +138,8 @@ public final class AppCatalogService {
             if (node == null) {
                 continue;
             }
-            AppPermissionRequirement req = AppPermissionRequirement.of(
-                    node, app.getPermissionVisibility(), null);
-            String result2 = AppPermissionService.get().evaluate(playerUuid, req);
-            if (PermissionResult.LOCKED.equals(result2)) {
+            if (!PermissionsModule.get().hasPermission(playerUuid, node)
+                    && "locked".equals(app.getPermissionVisibility())) {
                 result.add(app);
             }
             // HIDDEN apps are not added to any list

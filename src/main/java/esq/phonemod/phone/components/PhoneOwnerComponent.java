@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.Map;
+import esq.phonemod.PhoneMod;
 
 /**
  * Persistent component attached to any entity that owns a phone.
@@ -29,11 +30,14 @@ public class PhoneOwnerComponent implements Component<EntityStore> {
      * e.g. {@code "555-0001" → { "555-1234" → "Big Tony" }}
      */
     private Map<String, Map<String, String>> contacts;
+    private int schemaVersion = 2;
 
     // ── Codec ───────────────────────────────────────────────────────────────
 
     public static final BuilderCodec<PhoneOwnerComponent> CODEC =
             BuilderCodec.builder(PhoneOwnerComponent.class, PhoneOwnerComponent::new)
+                    .append(new KeyedCodec<>("SchemaVersion", Codec.INTEGER, true),
+                            (data, value) -> data.schemaVersion = value, data -> data.schemaVersion).add()
                     .append(
                             new KeyedCodec<>("Contacts",
                                     new MapCodec<>(
@@ -91,6 +95,9 @@ public class PhoneOwnerComponent implements Component<EntityStore> {
     }
 
     public void addContact(@Nonnull String ownNumber, @Nonnull String contactNumber, @Nonnull String displayName) {
+        if (displayName.isBlank() || displayName.length() > PhoneMod.config().maxContactNameCharacters()) {
+            throw new IllegalArgumentException("Invalid contact name");
+        }
         contacts.computeIfAbsent(ownNumber, k -> new HashMap<>()).put(contactNumber, displayName);
     }
 
@@ -99,5 +106,9 @@ public class PhoneOwnerComponent implements Component<EntityStore> {
         if (inner != null) inner.remove(contactNumber);
     }
 
-}
+    public void remapDevice(@Nonnull String oldAddress, @Nonnull String newAddress) {
+        Map<String, String> old = contacts.remove(oldAddress);
+        if (old != null) contacts.putIfAbsent(newAddress, old);
+    }
 
+}

@@ -1,0 +1,20 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/PlayerActions/Playground/message-received.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -0.5,
+        "MaxPitch": 0.5,
+        "MinVolume": -4
+      },
+      "StartDelay": 0,
+      "Volume": -2.0
+    }
+  ],
+  "Volume": 0,
+  "PreventSoundInterruption": true,
+  "MaxDistance": 4,
+  "StartAttenuationDistance": 2
+}

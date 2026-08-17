@@ -6,6 +6,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.device.api.DevicePageHandle;
 import esq.phonemod.phone.api.PhoneApp;
+import esq.phonemod.PhoneMod;
+import esq.phonemod.security.TokenBucket;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -19,6 +21,8 @@ public final class DeviceSession {
     private final String deviceAssetId;
     private final DeviceShell shell;
     private final PlayerRef playerRef;
+    private final java.util.UUID ownerUuid;
+    private final TokenBucket actionLimiter;
     private Ref<EntityStore> ref;
     private Store<EntityStore> store;
     private PhoneApp<?> currentApp;
@@ -36,6 +40,9 @@ public final class DeviceSession {
         this.deviceAssetId = deviceAssetId;
         this.shell = shell;
         this.playerRef = playerRef;
+        this.ownerUuid = playerRef.getUuid();
+        this.actionLimiter = new TokenBucket(
+                PhoneMod.config().uiActionsPerSecond(), PhoneMod.config().uiActionBurst());
         this.ref = ref;
         this.store = store;
     }
@@ -58,6 +65,14 @@ public final class DeviceSession {
     @Nonnull
     public PlayerRef getPlayerRef() {
         return playerRef;
+    }
+
+    public boolean isOwnedBy(@Nonnull java.util.UUID playerUuid) {
+        return ownerUuid.equals(playerUuid);
+    }
+
+    public boolean tryAcquireAction() {
+        return actionLimiter.tryAcquire();
     }
 
     @Nonnull
@@ -107,8 +122,7 @@ public final class DeviceSession {
         return pageHandle;
     }
 
-    public void setPageHandle(@Nonnull DevicePageHandle pageHandle) {
+    public void setPageHandle(@Nullable DevicePageHandle pageHandle) {
         this.pageHandle = pageHandle;
     }
 }
-

@@ -36,6 +36,10 @@ public final class DeviceRegistry {
         return getAsset(assetId) != null;
     }
 
+    public void invalidateAll() {
+        shells.clear();
+    }
+
     @Nonnull
     private DeviceShell createShell(@Nonnull String assetId) {
         DeviceAsset asset = getAsset(assetId);
@@ -45,4 +49,3 @@ public final class DeviceRegistry {
         return new DeviceShell(asset);
     }
 }
-

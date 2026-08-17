@@ -1,0 +1,48 @@
+$D = "../DustLib.ui";
+
+// ── Phone shell geometry ────────────────────────────────────────────────────
+// Calibrated to the PhoneBGTEST frame art. #Screen is ONE dark surface inset to
+// the painted "glass" so the software fills the display — the grey glass never
+// shows through. The insets slightly OVERFILL the glass so the dark screen meets
+// the black bezel with no grey seam; nudge them with the frame image if needed.
+@DeviceWide   = 316;
+@DeviceHeight = 650;
+@GlassTop     = 50;   // top bezel (speaker / camera band)
+@GlassBottom  = 46;   // bottom bezel
+@GlassSide    = 5;
+
+Group #PhoneOverlay {
+  Background: PatchStyle(Color: #000000(0.2));
+
+  Group #Device {
+    Anchor: (Height: @DeviceHeight, Width: @DeviceWide, Right: 140, Bottom: 60);
+    Background: "../Playground/PhoneBGTEST.png";
+    LayoutMode: Top;
+    Padding: (Top: @GlassTop, Bottom: @GlassBottom, Horizontal: @GlassSide);
+
+    // The device screen — one dark surface filling the glass. The status bar,
+    // app content, and home bar are stacked tonal layers on this surface.
+    Group #Screen {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Background: $D.@DustShellBackground;
+
+      // Persistent status bar (themed: topbar) — flush with the screen top.
+      $D.@DustStatusBar #TopBar {
+        @Logo    = "Phone/hytel_logo.png";
+        @Battery = "Phone/battery_icon.png";
+      }
+
+      // App content area (the device ContentSelector). Apps and the home grid
+      // (#APPHolder, built by DevicePage) fill the space between the two bars.
+      Group #AppContent {
+        FlexWeight: 1;
+        LayoutMode: Top;
+      }
+
+      // Persistent home bar (themed: bottombar) — slim, anchored to the screen.
+      $D.@DustHomeBar #BottomBar {
+      }
+    }
+  }
+}

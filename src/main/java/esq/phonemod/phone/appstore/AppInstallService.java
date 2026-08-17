@@ -3,9 +3,10 @@ package esq.phonemod.phone.appstore;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import esq.permission.api.AppPermissionRequirement;
-import esq.permission.api.AppPermissionService;
-import esq.permission.api.PermissionResult;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
+import com.hypixel.hytale.server.core.HytaleServer;
+import esq.phonemod.api.event.AppInstallationEvent;
 import esq.phonemod.phone.api.PhoneApp;
 import esq.phonemod.phone.core.PhoneService;
 
@@ -20,7 +21,7 @@ import java.util.UUID;
  *   <li>System apps ({@link PhoneApp#isSystemApp()}) cannot be uninstalled.</li>
  *   <li>An app with a required permission can only be installed if the player
  *       holds that permission (checked via
- *       {@link AppPermissionService}).</li>
+ *       Hytale permission node.</li>
  *   <li>{@link #seedDefaults} is idempotent: system apps are always present;
  *       non-system default apps are added only once on first open.</li>
  * </ul>
@@ -72,17 +73,20 @@ public final class AppInstallService {
         // Permission gate
         String requiredNode = app.getRequiredPermission();
         if (requiredNode != null) {
-            AppPermissionRequirement req = AppPermissionRequirement.of(
-                    requiredNode, app.getPermissionVisibility(), null);
-            String result = AppPermissionService.get().evaluate(playerUuid, req);
-            if (!PermissionResult.isAllowed(result)) {
+            if (!PermissionsModule.get().hasPermission(playerUuid, requiredNode)) {
                 return false;
             }
         }
+        AppInstallationEvent.Pre pre = HytaleServer.get().getEventBus()
+                .dispatchFor(AppInstallationEvent.Pre.class)
+                .dispatch(new AppInstallationEvent.Pre(playerUuid, deviceId, appId, true));
+        if (pre.isCancelled()) return false;
         DeviceInstalledAppsComponent comp = store.ensureAndGetComponent(
                 ref, DeviceInstalledAppsComponent.getComponentType());
         comp.install(deviceId, appId);
         store.putComponent(ref, DeviceInstalledAppsComponent.getComponentType(), comp);
+        HytaleServer.get().getEventBus().dispatchFor(AppInstallationEvent.Post.class)
+                .dispatch(new AppInstallationEvent.Post(playerUuid, deviceId, appId, true));
         return true;
     }
 
@@ -103,6 +107,12 @@ public final class AppInstallService {
         if (app != null && app.isSystemApp()) {
             return false;
         }
+        PlayerRef player = store.getComponent(ref, PlayerRef.getComponentType());
+        if (player == null) return false;
+        AppInstallationEvent.Pre pre = HytaleServer.get().getEventBus()
+                .dispatchFor(AppInstallationEvent.Pre.class)
+                .dispatch(new AppInstallationEvent.Pre(player.getUuid(), deviceId, appId, false));
+        if (pre.isCancelled()) return false;
         DeviceInstalledAppsComponent comp = store.ensureAndGetComponent(
                 ref, DeviceInstalledAppsComponent.getComponentType());
         if (!comp.isInstalled(deviceId, appId)) {
@@ -110,6 +120,8 @@ public final class AppInstallService {
         }
         comp.uninstall(deviceId, appId);
         store.putComponent(ref, DeviceInstalledAppsComponent.getComponentType(), comp);
+        HytaleServer.get().getEventBus().dispatchFor(AppInstallationEvent.Post.class)
+                .dispatch(new AppInstallationEvent.Post(player.getUuid(), deviceId, appId, false));
         return true;
     }
 
@@ -183,7 +195,7 @@ public final class AppInstallService {
             } else if (firstSeed) {
                 // Non-system defaults: seed only once, but respect permissions.
                 String requiredNode = app.getRequiredPermission();
-                if (requiredNode == null || AppPermissionService.get().hasPermission(playerUuid, requiredNode)) {
+                if (requiredNode == null || PermissionsModule.get().hasPermission(playerUuid, requiredNode)) {
                     installed.add(appId);
                 }
             }

@@ -1,0 +1,192 @@
+# 2.0.0-alpha.1 verification evidence
+
+Verified through 2026-08-15 against the workspace Hytale server and asset tree with JDK 25.
+
+## Automated build and tests
+
+The Maven reactor was run in `maven:3.9-eclipse-temurin-25`:
+
+```text
+Compiling 37 API source files
+Compiling 138 runtime source files
+Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+Covered suites include public API contracts, identity claims/transfers/shared identities,
+idempotent component migration, UI payload validation, scalar BSON event decoding, rate
+limiting, call-session transitions, configuration codec round-trips and runtime range
+validation, call-audio override mapping, player-bound identity reuse, settings-view asset
+separation, legacy player-setting defaults, player-setting round trips, and immutable
+notification/routing preference snapshots. The remaining integration and multiplayer
+cases stay open in the roadmap.
+
+## Consumer compile matrix
+
+Each known consumer built successfully with `phonemod-api:2.0.0-alpha.1` installed as its
+compile-only API dependency:
+
+| Consumer | Maven package |
+|---|---:|
+| AmazonMod | PASS |
+| Banking | PASS |
+| Boilerplate App | PASS |
+| Computers | PASS |
+| Pocket Tasks | PASS |
+| Relay Ops | PASS |
+| Signal Sweep | PASS |
+| SocialCore | PASS |
+| Trading App | PASS |
+
+This is compile evidence, not the runtime-combination or in-game smoke evidence required
+by the RC gate.
+
+## Production JAR
+
+`scripts/assert-release-jar.sh` verified the runtime manifest identifier, public API
+classes, both asset roots, phone item, phone UI, sounds, and language resources. Two
+consecutive packages produced the same artifact hash:
+
+```text
+cf164f68b0d751aa2013bcec702ce09de9efbf0d2cc88ec286f8bb79d718c6ed
+```
+
+## Disposable-server boot
+
+The production JAR was the only external mod in a fresh, isolated universe. The boot log
+contained:
+
+```text
+[Phonemod] Setup complete!
+Enabled plugin esq.phonemod:Phonemod
+Universe ready!
+Hytale Server Booted! [Multiplayer, Fresh Universe]
+```
+
+There was no plugin-specific exception. Hytale emitted its known native buffer
+`SERR Reallocate` diagnostics while loading the base asset tree.
+
+## Hytest deployment and integration boot
+
+The candidate was deployed to the persistent pre-release hytest server on 2026-08-14.
+The deployed dependency-complete subset used these production artifacts:
+
+| Plugin | SHA-256 |
+|---|---|
+| Phonemod | `2e8e1713063503b42d90ec0e9bf8b4f2cba556905f6acd6ed2e17ce00c401fbc` |
+| Banking | `ed5cab37a3427b3702f217de514ac0784c7ff30ce13ea2ae6a0f7fa935eb100a` |
+| SocialCore | `126fe374699e480bf8aab86872545525e7a54351afdf26a0ddc4f2b786de77f1` |
+| Character Framework | `a111020648e01587f18c59ecbe6ba1b20b0b6c13d0b3e254ca2b75ee8393a237` |
+| AuctionHouse | `81468bce5f1c8120755e09ee26019a1170c42a832924de721af73178f027f36e` |
+| Banking UI manifest | `a26919f5c2733cfd928c301bedac6dd39bcd2c558f1001cbdbd2858d4f9e2430` |
+
+The first integration boot exposed two packaging facts and was not accepted: Hytale does
+not include `2.0.0-alpha.1` in an old consumer's `>=1.0.0` range, and SocialCore's system-
+scoped permission library was not included by Maven Shade. Migrated Banking/SocialCore
+manifests were deployed, and SocialCore was corrected to shade its intended permission
+library. The rebuilt production JAR contains nine `esq.permission` classes.
+
+The corrected boot loaded the existing universe and reached:
+
+```text
+Enabled plugin esq.phonemod:Phonemod
+Enabled plugin esq.banking:Banking
+Enabled plugin socialcore:SocialCore
+Enabled plugin esq:character-framework
+Enabled plugin esq:AuctionHouse
+Universe ready!
+Hytale Server Booted! [Multiplayer]
+```
+
+Live console smoke checks reported:
+
+```text
+Phonemod API 2.0.0-alpha.1
+Apps: 7 | Devices: 0
+Pending saves: 0 | Migration conflicts: 0
+Rejected: 0 | Rate limits: 0 | Save failures: 0
+Device assets: 1 | Asset health: healthy
+Dry run: 0 identities, 0 known conflicts; no data changed.
+Schema: v2 | identities=0 conflicts=0 pendingSaves=0
+```
+
+The bundled `Phone` item was additionally given the vanilla `Tool` creative category and
+type tag. Real hytest loaded `esq.phonemod:Phonemod` as an asset pack, and the live console
+confirmed `You gave Esquirtle 1 of Phone`. The first phone interaction exposed that the
+client legitimately emits numeric `State` values; the decoder now canonicalizes bounded
+scalar BSON primitives while still rejecting arrays and documents. The player confirmed
+the corrected phone works after redeployment.
+
+Banking deliberately ships Java and assets separately. The required version-bumped
+`banking:ui` directory pack was deployed with 35 files, including the phone app, ATM,
+physical vault, currency assets, models, icons, interactions, and language file. A live
+client joined after the pack loaded without a custom-UI parser error. Opening the ATM
+physical vault with a metadata-bearing phone initially made the client reject
+`#PlayerInventoryGrid.Slots`. Banking was corrected to strip server-only item metadata
+from display copies while retaining the original stacks for deposits and withdrawals.
+After the JDK 25 build passed all eight Banking tests and the replacement JAR reached
+`ENABLED`, the player repeated the same ATM-vault action with the phone present and
+confirmed the client error was gone.
+
+Real hytest remained running behind the direct UDP 5521 endpoint. Rollback copies of the
+replaced artifacts are outside the mod search path under
+`/opt/hyserver/hytest/Server/mod-backups/phonemod-auction-20260814T232500Z/` and
+`/opt/hyserver/hytest/Server/mod-backups/phonemod-ui-decoder-20260814T233000Z/`. The
+pre-fix Banking JAR is retained under
+`/opt/hyserver/hytest/Server/mod-backups/banking-itemgrid-20260814T234200Z/`.
+
+## Framework configuration UI deployment
+
+On 2026-08-15, Settings was split into a default Player tab and an admin-only Plugin tab,
+then deployed to both the disposable server and persistent hytest. Plugin settings control
+identity binding, call availability/privacy/reachability/timing/speaker radius, offline
+messaging, and message length with codec-validated persisted values. Toggleable calls also
+expose active-call speaker/private controls to their endpoints.
+
+Player settings now drive theme, wallpaper, launcher layout, sound, message alerts,
+message-preview privacy, incoming-call Do Not Disturb, and reset-to-default behavior. The
+unimplemented Mono icon pack option was removed. Notification and call preferences are
+published as immutable concurrent snapshots, avoiding target-player ECS access from a
+caller or delivery thread.
+
+Two consecutive JDK 25 packages produced the same updated JAR hash,
+`cf164f68b0d751aa2013bcec702ce09de9efbf0d2cc88ec286f8bb79d718c6ed`; release
+content assertions passed, and the JAR contained `DustSettings.ui`, `DustActiveCall.ui`,
+the configuration enums, and the public speaker action constants. The disposable server
+and dependency-complete hytest stack both reached `ENABLED`, `Universe ready!`, and
+`Hytale Server Booted!`. A real admin client downloaded the expanded Player-tab pack and
+joined the hytest world without a custom-UI parser error. The live player document then
+persisted `AppLayout: List` together with the new notification, preview, and incoming-call
+fields. Visual confirmation of each setting and two-client messaging/calling behavior
+remain the current in-game acceptance step.
+
+The prior hytest JAR can be restored from
+`/opt/hyserver/hytest/Server/mod-backups/phonemod-config-ui-20260815T000803Z/Phonemod.jar`.
+The immediately preceding split-tab build is retained at
+`/opt/hyserver/hytest/Server/mod-backups/phonemod-player-settings-20260815T003330Z/Phonemod.jar`.
+
+## Asset-validation gate
+
+The packaged and extracted-asset validator attempts did not produce a global PASS:
+
+1. An immutable `Assets.zip` run failed every vanilla instance with
+   `Universe.makeWorld: Invalid path`, because the instance validator requires a writable
+   RocksDB shadow for `Server/Instances`.
+2. With the documented writable shadow in place, validation advanced through the base
+   assets but deadlocked in the vanilla `Gyms/Gym_Movement` instance with
+   `IllegalStateException: Thread 'WorldMap - instance-validate-Gyms-Gym_Movement' is
+   already started`.
+
+Phonemod's strict device-asset startup validation passed during the disposable boot and
+the server reported one loaded `DeviceAsset` and three `DeviceThemeAsset` records. The
+roadmap's global Hytale asset-validation checkbox remains open until the upstream
+instance-validator failure is fixed or a known-good validation server build is supplied.
+
+## External acceptance still required
+
+The following gates cannot be honestly completed by an isolated build environment:
+
+- copied-v1 migration, conflict resolution, and rollback rehearsals;
+- dependency-complete runtime combinations for the remaining consumers;
+- the multiplayer and audio-policy acceptance checklist; and
+- reviewer sign-off on migration/rollback evidence.

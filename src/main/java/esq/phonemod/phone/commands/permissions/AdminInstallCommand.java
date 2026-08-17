@@ -63,28 +63,28 @@ final class AdminInstallCommand extends AbstractPlayerCommand {
             return;
         }
 
-        PhoneRegistry.OnlineEntry entry = PhoneRegistry.getOnlineEntry(devices.get(0));
+        PhoneRegistry.PresenceEntry entry = PhoneRegistry.getPresenceEntry(devices.get(0));
         if (entry == null) {
             context.sendMessage(Message.translation("phonemod.permissions.apps.noDevices")
                     .insert(targetName));
             return;
         }
 
-        int installed = 0;
-        for (String deviceId : devices) {
-            // Admin force-install: bypass permission gate by using the target's UUID
-            // but also directly writing the component for admin override.
-            esq.phonemod.phone.appstore.DeviceInstalledAppsComponent comp =
-                    entry.store().ensureAndGetComponent(
-                            entry.ref(), esq.phonemod.phone.appstore.DeviceInstalledAppsComponent
-                                    .getComponentType());
-            comp.install(deviceId, appId);
-            entry.store().putComponent(entry.ref(),
-                    esq.phonemod.phone.appstore.DeviceInstalledAppsComponent.getComponentType(), comp);
-            installed++;
-        }
-
-        context.sendMessage(Message.translation("phonemod.permissions.apps.install.success")
-                .insert(appId).insert(targetName).insert(String.valueOf(installed)));
+        entry.world().execute(() -> {
+            if (!entry.ref().isValid()) return;
+            int installed = 0;
+            for (String deviceId : devices) {
+                esq.phonemod.phone.appstore.DeviceInstalledAppsComponent comp =
+                        entry.store().ensureAndGetComponent(entry.ref(),
+                                esq.phonemod.phone.appstore.DeviceInstalledAppsComponent
+                                        .getComponentType());
+                comp.install(deviceId, appId);
+                entry.store().putComponent(entry.ref(),
+                        esq.phonemod.phone.appstore.DeviceInstalledAppsComponent.getComponentType(), comp);
+                installed++;
+            }
+            context.sendMessage(Message.translation("phonemod.permissions.apps.install.success")
+                    .insert(appId).insert(targetName).insert(String.valueOf(installed)));
+        });
     }
 }

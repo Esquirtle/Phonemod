@@ -77,6 +77,10 @@ public final class DeviceService {
         return registry.hasAsset(assetId);
     }
 
+    public void invalidateShells() {
+        registry.invalidateAll();
+    }
+
     @Nonnull
     public DeviceSession createSession(@Nonnull PlayerRef playerRef,
             @Nonnull Ref<EntityStore> ref,

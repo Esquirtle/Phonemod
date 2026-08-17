@@ -1,6 +1,7 @@
 package esq.phonemod.device.components;
 
 import com.hypixel.hytale.codec.KeyedCodec;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.component.Component;
@@ -19,6 +20,9 @@ public final class DeviceSettingsComponent implements Component<EntityStore> {
 
     public static final BuilderCodec<DeviceSettingsComponent> CODEC = BuilderCodec
             .builder(DeviceSettingsComponent.class, DeviceSettingsComponent::new)
+            .append(new KeyedCodec<>("SchemaVersion", Codec.INTEGER, true),
+                    (component, value) -> component.schemaVersion = value,
+                    component -> component.schemaVersion).add()
             .append(new KeyedCodec<>("SettingsByDeviceId",
                             new MapCodec<>(DeviceSettings.CODEC, HashMap::new, false)),
                     (component, value) -> component.settingsByDeviceId = value,
@@ -29,6 +33,7 @@ public final class DeviceSettingsComponent implements Component<EntityStore> {
     private static ComponentType<EntityStore, DeviceSettingsComponent> componentType;
 
     private Map<String, DeviceSettings> settingsByDeviceId;
+    private int schemaVersion = 2;
 
     public DeviceSettingsComponent() {
         this.settingsByDeviceId = new HashMap<>();
@@ -72,5 +77,9 @@ public final class DeviceSettingsComponent implements Component<EntityStore> {
     public void clear(@Nonnull String deviceId) {
         settingsByDeviceId.remove(deviceId);
     }
-}
 
+    public void remapDevice(@Nonnull String oldAddress, @Nonnull String newAddress) {
+        DeviceSettings old = settingsByDeviceId.remove(oldAddress);
+        if (old != null) settingsByDeviceId.putIfAbsent(newAddress, old);
+    }
+}

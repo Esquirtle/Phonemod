@@ -7,8 +7,6 @@ import esq.phonemod.device.events.DeviceAppCloseEvent;
 import esq.phonemod.device.events.DeviceCloseEvent;
 import esq.phonemod.device.events.DeviceSettingsChangedEvent;
 import esq.phonemod.device.events.PhoneEvents;
-import esq.permission.api.AppPermissionService;
-import esq.permission.service.RoleService;
 import esq.phonemod.phone.apps.AppStoreApp;
 import esq.phonemod.phone.apps.CallsApp;
 import esq.phonemod.phone.apps.ContactsApp;
@@ -19,8 +17,14 @@ import esq.phonemod.phone.appstore.AppCatalogService;
 import esq.phonemod.phone.appstore.AppInstallService;
 import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.CallRegistry;
+import esq.phonemod.phone.messaging.PhoneRegistry;
 import esq.phonemod.phone.sync.SyncService;
 import esq.phonemod.phone.sync.Viewer;
+import esq.phonemod.platform.RuntimeDevicePlatform;
+import esq.phonemod.phone.sync.LegacySyncBridge;
+import esq.phonemod.phone.sync.RuntimeLegacySyncBridge;
+import esq.phonemod.operations.AssetHealthService;
+import esq.phonemod.operations.OperationalMetrics;
 
 public class SetupManager {
     private final PhoneMod plugin;
@@ -29,14 +33,18 @@ public class SetupManager {
     private final EventRegistryManager eventRegistryManager;
     private final CommandRegistryManager commandRegistryManager;
     private final InteractionSetupManager interactionSetupManager;
+    private final RuntimeDevicePlatform devicePlatform;
+    private final RuntimeLegacySyncBridge legacySyncBridge;
+    private final AssetHealthService assetHealth = new AssetHealthService();
 
 
     public SetupManager(PhoneMod plugin) {
         this.plugin = plugin;
         DeviceService.initialize();
         PhoneService.initialize();
-        AppPermissionService.initialize();
-        RoleService.initialize();
+        this.devicePlatform = new RuntimeDevicePlatform();
+        this.legacySyncBridge = new RuntimeLegacySyncBridge();
+        LegacySyncBridge.install(legacySyncBridge);
         AppInstallService.initialize();
         AppCatalogService.initialize();
         this.assetRegistryManager = new AssetRegistryManager(plugin);
@@ -82,8 +90,13 @@ public class SetupManager {
      */
     public void registerThemeListener() {
         PhoneEvents.subscribe(DeviceSettingsChangedEvent.class, event -> {
+            PhoneRegistry.updatePreferences(
+                    event.getSession().getDeviceId(), event.getNewSettings());
             DevicePageHandle handle = event.getSession().getPageHandle();
             String themeId = event.getNewSettings().getThemeId();
+            if (themeId == null || themeId.isBlank()) {
+                themeId = event.getSession().getShell().getDefaultThemeId();
+            }
             if (handle != null && themeId != null && !themeId.isBlank()) {
                 handle.reapplyTheme(themeId);
             }
@@ -91,12 +104,12 @@ public class SetupManager {
     }
 
     public void registerApps() {
-        PhoneService.get().registerApp(new WhatgramApp());
-        PhoneService.get().registerApp(new ContactsApp());
-        PhoneService.get().registerApp(new CallsApp());
-        PhoneService.get().registerApp(new SettingsApp());
-        PhoneService.get().registerApp(new AppStoreApp());
-        PhoneService.get().registerApp(new GroupChatApp());
+        devicePlatform.apps().registerLegacyApp(plugin, "phonemod:whatgram", java.util.Set.of("whatgram"), new WhatgramApp());
+        devicePlatform.apps().registerLegacyApp(plugin, "phonemod:contacts", java.util.Set.of("contacts"), new ContactsApp());
+        devicePlatform.apps().registerLegacyApp(plugin, "phonemod:calls", java.util.Set.of("calls"), new CallsApp());
+        devicePlatform.apps().registerLegacyApp(plugin, "phonemod:settings", java.util.Set.of("settings"), new SettingsApp());
+        devicePlatform.apps().registerLegacyApp(plugin, "phonemod:appstore", java.util.Set.of("appstore"), new AppStoreApp());
+        devicePlatform.apps().registerLegacyApp(plugin, "phonemod:groupchat", java.util.Set.of("groupchat"), new GroupChatApp());
     }
     public void registerAssets() {
         assetRegistryManager.register();
@@ -111,13 +124,21 @@ public class SetupManager {
     }
 
     public void initializeRuntime() {
+        devicePlatform.load();
+        PhoneRegistry.initMailboxes();
+        assetHealth.validate();
         componentRegistryManager.registerSystems();
         CallRegistry.startTimeoutWatcher();
         // Sync channels persist as JSON under the plugin data directory; bind the
         // store, then rehydrate persistent channels and clear stale ephemeral ones.
         SyncService.init(plugin.getDataDirectory());
         SyncService.loadAll();
+        OperationalMetrics.get().bind(PhoneRegistry::activePresenceCount,
+                CallRegistry::activeSessionCount, PhoneRegistry::mailboxDepth,
+                SyncService::pendingSaves, devicePlatform.identities()::conflictCount);
     }
+
+    public AssetHealthService.Report assetHealth() { return assetHealth.report(); }
 
     public void registerCommands() {
         commandRegistryManager.register();
@@ -130,6 +151,10 @@ public class SetupManager {
     public void shutdown() {
         CallRegistry.stopTimeoutWatcher();
         SyncService.flushAll();
+        PhoneRegistry.flushMailboxes();
+        eventRegistryManager.shutdown();
+        devicePlatform.shutdown();
+        LegacySyncBridge.uninstall(legacySyncBridge);
         PhoneEvents.unsubscribeAll(DeviceSettingsChangedEvent.class);
         PhoneEvents.unsubscribeAll(DeviceAppCloseEvent.class);
         PhoneEvents.unsubscribeAll(DeviceCloseEvent.class);

@@ -5,6 +5,7 @@ import javax.annotation.Nullable;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import org.bson.BsonDocument;
 
 /**
  * One live instance of a {@link SyncChannelType}: its shared {@code state} plus the
@@ -27,6 +28,8 @@ public final class SyncChannel<S> {
     /** Content hash of the last persisted JSON, for dirty-gated writes. */
     @Nullable
     private volatile String savedHash;
+    private long nextSaveSequence;
+    private long savedSequence;
 
     SyncChannel(@Nonnull SyncChannelType<S> type, @Nonnull String id, @Nonnull S state) {
         this.type = type;
@@ -85,4 +88,24 @@ public final class SyncChannel<S> {
     void setSavedHash(@Nullable String hash) {
         this.savedHash = hash;
     }
+
+    @Nonnull
+    Snapshot snapshot() {
+        synchronized (lock) {
+            BsonDocument document = type.codec().encode(state).asDocument();
+            return new Snapshot(++nextSaveSequence, document,
+                    Hashing.sha256Hex(document.toJson()));
+        }
+    }
+
+    void markSaved(long sequence, @Nonnull String hash) {
+        synchronized (lock) {
+            if (sequence >= savedSequence) {
+                savedSequence = sequence;
+                savedHash = hash;
+            }
+        }
+    }
+
+    record Snapshot(long sequence, @Nonnull BsonDocument document, @Nonnull String hash) {}
 }

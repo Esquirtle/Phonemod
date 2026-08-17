@@ -5,7 +5,7 @@ import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
-import esq.permission.service.RoleService;
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 
 import javax.annotation.Nonnull;
 import java.util.Set;
@@ -28,7 +28,7 @@ final class RolesCommand extends CommandBase {
         if (uuid == null) {
             return;
         }
-        Set<String> roles = RoleService.get().getRoles(uuid);
+        Set<String> roles = PermissionsModule.get().getGroupsForUser(uuid);
         context.sendMessage(Message.translation("phonemod.permissions.roles.list")
                 .insert(playerInput)
                 .insert(roles.isEmpty()

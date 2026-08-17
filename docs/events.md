@@ -1,4 +1,6 @@
-# Events
+# Events (legacy v1)
+
+New integrations use the typed shared events described in [V2_API.md](V2_API.md).
 
 Phonemod has two separate event models:
 

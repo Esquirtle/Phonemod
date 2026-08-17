@@ -1,6 +1,5 @@
 package esq.phonemod.setup;
 
-import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
@@ -20,7 +19,7 @@ public class AssetRegistryManager {
         public void register() {
                 LOGGER.atInfo().log("Registering Asset Registry");
 
-                AssetRegistry.register(
+                plugin.getAssetRegistry().register(
                                 HytaleAssetStore.builder(DeviceAsset.class,
                                                 new DefaultAssetMap<String, DeviceAsset>())
                                                 .setPath("Phonemod/Devices")
@@ -28,7 +27,7 @@ public class AssetRegistryManager {
                                                 .setKeyFunction(DeviceAsset::getId)
                                                 .build());
 
-                AssetRegistry.register(
+                plugin.getAssetRegistry().register(
                                 HytaleAssetStore.builder(DeviceThemeAsset.class,
                                                 new DefaultAssetMap<String, DeviceThemeAsset>())
                                                 .setPath("Phonemod/Themes")

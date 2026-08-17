@@ -34,6 +34,8 @@ public final class DeviceInstalledAppsComponent implements Component<EntityStore
 
     public static final BuilderCodec<DeviceInstalledAppsComponent> CODEC =
             BuilderCodec.builder(DeviceInstalledAppsComponent.class, DeviceInstalledAppsComponent::new)
+                    .append(new KeyedCodec<>("SchemaVersion", Codec.INTEGER, true),
+                            (comp, value) -> comp.schemaVersion = value, comp -> comp.schemaVersion).add()
                     .append(
                             new KeyedCodec<>("DeviceInstalledApps",
                                     new MapCodec<>(
@@ -47,6 +49,7 @@ public final class DeviceInstalledAppsComponent implements Component<EntityStore
     // ── State ─────────────────────────────────────────────────────────────────
 
     private Map<String, Set<String>> installedByDeviceId;
+    private int schemaVersion = 2;
 
     // ── ComponentType holder ──────────────────────────────────────────────────
 
@@ -124,5 +127,10 @@ public final class DeviceInstalledAppsComponent implements Component<EntityStore
         if (apps != null) {
             apps.remove(appId);
         }
+    }
+
+    public void remapDevice(@Nonnull String oldAddress, @Nonnull String newAddress) {
+        Set<String> old = installedByDeviceId.remove(oldAddress);
+        if (old != null) installedByDeviceId.putIfAbsent(newAddress, old);
     }
 }

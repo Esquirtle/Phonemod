@@ -2,6 +2,7 @@ package esq.phonemod.device.core;
 
 import esq.phonemod.device.assets.DeviceAsset;
 import esq.phonemod.device.assets.DeviceSoundProfile;
+import esq.phonemod.device.assets.CallAudioPolicy;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,6 +30,7 @@ public final class DeviceShell {
     private final String defaultWallpaper;
     private final String defaultIconPack;
     private final DeviceSoundProfile soundProfile;
+    private final CallAudioPolicy callAudioPolicy;
     private final Map<String, String> selectors;
 
     public DeviceShell(@Nonnull DeviceAsset asset) {
@@ -47,6 +49,7 @@ public final class DeviceShell {
         this.defaultWallpaper = asset.getDefaultWallpaper();
         this.defaultIconPack = asset.getDefaultIconPack();
         this.soundProfile = asset.getSoundProfile();
+        this.callAudioPolicy = asset.getCallAudioPolicy();
         this.selectors = asset.getSelectors();
     }
 
@@ -128,6 +131,11 @@ public final class DeviceShell {
     }
 
     @Nonnull
+    public CallAudioPolicy getCallAudioPolicy() {
+        return callAudioPolicy;
+    }
+
+    @Nonnull
     public String selector(@Nonnull String key, @Nonnull String fallback) {
         String selector = selectors.get(key);
         return selector != null && !selector.isBlank() ? selector : fallback;
@@ -142,4 +150,3 @@ public final class DeviceShell {
         return selectors != null ? Collections.unmodifiableMap(selectors) : Collections.emptyMap();
     }
 }
-

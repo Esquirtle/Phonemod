@@ -1,0 +1,17 @@
+// One contacts-list row, appended into #ContactsList.
+// Contract: app sets #ContactName.Text and binds #ChatButton / #CallButton /
+// #RemoveButton.
+$D = "../../DustLib.ui";
+
+$D.@DustShellListEntry #ContactsEntry {
+  Anchor: (Height: $D.@DustShellListEntryHeight, Bottom: 6);
+
+  Label #ContactName {
+    FlexWeight: 1;
+    Text: "Name (555-0000)";
+    Style: (FontSize: 13, TextColor: $D.@DustTextPrimary, Wrap: true);
+  }
+  $D.@DustShellActionButton #ChatButton    { Anchor: (Width: 46, Height: 38, Right: 4); Text: "Chat"; }
+  $D.@DustShellSecondaryButton #CallButton { Anchor: (Width: 46, Height: 38, Right: 4); Text: "Call"; }
+  $D.@DustShellDangerButton #RemoveButton  { Anchor: (Width: 46, Height: 38); Text: "Del"; }
+}

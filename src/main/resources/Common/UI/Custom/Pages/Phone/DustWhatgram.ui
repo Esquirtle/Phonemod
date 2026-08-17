@@ -1,0 +1,37 @@
+// Whatgram root — fully composed from DustLib components.
+//
+// SINGLE-ROOT contract — this one document owns BOTH the conversation-list view
+// and the chat view. The Java app never swaps the shell content area; it only
+// toggles child visibility and re-fills #WhatgramContent. This keeps the themed
+// selectors (#WhatgramHeader / #WhatgramPanel / #WhatgramContent) alive at all
+// times, which is what previously crashed when the chat view replaced the root.
+//
+//   #WhatgramHeader   @DustAppBar — "Whatgram" (list) OR back/name/Call (chat)
+//     #BackButton / #HeaderTitle / #ActionButton
+//   #WhatgramPanel    themed panel surface (role: appPanel)
+//     #WhatgramContent  scrolling list — conversation rows OR message bubbles
+//     #WhatgramComposer @DustShellMessageInput (#DustMessageInput / #DustSendButton)
+$D = "../DustLib.ui";
+
+Group {
+  FlexWeight: 1;
+  LayoutMode: Top;
+
+  // Header doubles as the chat top bar. Back/Call start hidden; the app reveals
+  // them and retitles #HeaderTitle when a chat is open. Themeable: appHeader.
+  $D.@DustAppBar #WhatgramHeader { @Title = "Whatgram"; @ActionText = "Call"; }
+
+  // Themed panel (role: appPanel) holding the list and the composer.
+  $D.@DustShellPanel #WhatgramPanel {
+    FlexWeight: 1;
+
+    // Scrolling list — conversation rows OR message bubbles (role: appContent).
+    $D.@DustScrollList #WhatgramContent { }
+
+    // Chat composer (#DustMessageInput / #DustSendButton). Hidden in list view.
+    $D.@DustShellMessageInput #WhatgramComposer {
+      Visible: false;
+      Anchor: (Height: $D.@DustShellMessageInputHeight, Top: $D.@DustShellSpacing);
+    }
+  }
+}

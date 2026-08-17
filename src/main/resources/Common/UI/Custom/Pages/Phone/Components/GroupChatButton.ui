@@ -1,0 +1,6 @@
+// Group Chat app-grid button. Structure/style from DustLib; reuses the Whatgram
+// icon (no dedicated icon asset). @Icon path is relative to DustLib.ui's folder
+// (Pages/), hence "Phone/..".
+$D = "../../DustLib.ui";
+
+$D.@PhoneAppButton #APPBUTTONENTRY { @Icon = "Phone/Whatgram.png"; }

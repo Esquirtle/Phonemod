@@ -7,6 +7,7 @@ import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import esq.phonemod.PhoneMod;
 
 import javax.annotation.Nonnull;
 import java.util.Arrays;
@@ -30,6 +31,8 @@ public final class CallHistoryComponent implements Component<EntityStore> {
 
     public static final BuilderCodec<CallHistoryComponent> CODEC =
             BuilderCodec.builder(CallHistoryComponent.class, CallHistoryComponent::new)
+                    .append(new KeyedCodec<>("SchemaVersion", com.hypixel.hytale.codec.Codec.INTEGER, true),
+                            (data, value) -> data.schemaVersion = value, data -> data.schemaVersion).add()
                     .append(
                             new KeyedCodec<>("History",
                                     new MapCodec<>(RECORD_ARRAY_CODEC, HashMap::new, false)),
@@ -42,6 +45,7 @@ public final class CallHistoryComponent implements Component<EntityStore> {
 
     /** own phone number → ordered call records (most recent last). */
     private Map<String, CallRecord[]> history;
+    private int schemaVersion = 2;
 
     // ── Constructors ──────────────────────────────────────────────────────────
 
@@ -83,8 +87,13 @@ public final class CallHistoryComponent implements Component<EntityStore> {
     @Nonnull
     public CallHistoryComponent addRecord(@Nonnull String ownNumber, @Nonnull CallRecord record) {
         CallRecord[] existing = history.getOrDefault(ownNumber, new CallRecord[0]);
-        CallRecord[] updated  = Arrays.copyOf(existing, existing.length + 1);
-        updated[existing.length] = record;
+        int limit = PhoneMod.config().callRecordsPerDevice();
+        int retained = Math.min(existing.length, Math.max(0, limit - 1));
+        CallRecord[] updated = new CallRecord[retained + 1];
+        if (retained > 0) {
+            System.arraycopy(existing, existing.length - retained, updated, 0, retained);
+        }
+        updated[retained] = record;
         history.put(ownNumber, updated);
         return this;
     }
@@ -99,5 +108,10 @@ public final class CallHistoryComponent implements Component<EntityStore> {
         return records != null
                 ? Collections.unmodifiableList(Arrays.asList(records))
                 : Collections.emptyList();
+    }
+
+    public void remapDevice(@Nonnull String oldAddress, @Nonnull String newAddress) {
+        CallRecord[] old = history.remove(oldAddress);
+        if (old != null) history.putIfAbsent(newAddress, old);
     }
 }

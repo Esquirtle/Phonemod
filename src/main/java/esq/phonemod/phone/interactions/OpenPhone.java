@@ -7,6 +7,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.InteractionContext;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInstantInteraction;
@@ -19,10 +20,15 @@ import esq.phonemod.device.core.DeviceShell;
 import esq.phonemod.device.ui.DevicePage;
 import esq.phonemod.phone.components.PhoneOwnerComponent;
 import esq.phonemod.phone.messaging.PhoneRegistry;
+import esq.phonemod.platform.RuntimeDevicePlatform;
+import esq.phonemod.identity.IdentityRegistry;
+import esq.phonemod.migration.PlayerDeviceDataMigrator;
+import esq.phonemod.PhoneMod;
+import esq.phonemod.config.AddressBindingMode;
 import org.bson.BsonString;
 
 import javax.annotation.Nonnull;
-import java.util.Random;
+import java.util.UUID;
 
 /**
  * Interaction that opens the phone device page for the activating player.
@@ -43,7 +49,7 @@ import java.util.Random;
 public final class OpenPhone extends SimpleInstantInteraction {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-    private static final Random RANDOM = new Random();
+    private static final String IDENTITY_METADATA_KEY = "PhonemodDeviceIdentity";
 
     public static final BuilderCodec<OpenPhone> CODEC = BuilderCodec
             .builder(OpenPhone.class, OpenPhone::new, SimpleInstantInteraction.CODEC)
@@ -86,18 +92,30 @@ public final class OpenPhone extends SimpleInstantInteraction {
 
         String metadataKey = shell.getMetadataKey();
         String existingId = heldItem.getFromMetadataOrNull(metadataKey, Codec.STRING);
-        final String deviceId;
-
-        if (existingId != null) {
-            deviceId = existingId;
-        } else {
-            // Generate a new device ID and stamp it into the item metadata.
-            deviceId = generatePhoneNumber();
-            ItemStack stamped = heldItem.withMetadata(metadataKey, new BsonString(deviceId));
-            context.getHeldItemContainer().setItemStackForSlot(context.getHeldItemSlot(), stamped);
-            context.setHeldItem(stamped);
-            LOGGER.atFine().log("[OpenPhone] Assigned new device ID %s to item (key=%s)", deviceId, metadataKey);
+        String embeddedIdentity = heldItem.getFromMetadataOrNull(IDENTITY_METADATA_KEY, Codec.STRING);
+        UUID identityId = null;
+        if (embeddedIdentity != null) {
+            try { identityId = UUID.fromString(embeddedIdentity); }
+            catch (IllegalArgumentException ignored) { LOGGER.atWarning().log("Invalid embedded device identity"); }
         }
+        IdentityRegistry identities = RuntimeDevicePlatform.get().identities();
+        IdentityRegistry.Claim claim = PhoneMod.config().addressBindingMode()
+                == AddressBindingMode.PLAYER
+                ? identities.claimPlayer(playerRef.getUuid())
+                : identities.claimLegacy(identityId, existingId, playerRef.getUuid());
+        final String deviceId = claim.identity().address();
+        if (deviceId == null) {
+            playerRef.sendMessage(Message.raw("This device does not currently have an address."));
+            return;
+        }
+        if (existingId != null && !existingId.equals(deviceId)) {
+            PlayerDeviceDataMigrator.remap(ref, commandBuffer.getStore(), existingId, deviceId);
+        }
+        ItemStack stamped = heldItem
+                .withMetadata(metadataKey, new BsonString(deviceId))
+                .withMetadata(IDENTITY_METADATA_KEY, new BsonString(claim.identity().id().toString()));
+        context.getHeldItemContainer().setItemStackForSlot(context.getHeldItemSlot(), stamped);
+        context.setHeldItem(stamped);
 
         // Build the session and page on the tick thread so the page reference is
         // ready before PhoneRegistry.register stores it for live push callbacks.
@@ -121,14 +139,4 @@ public final class OpenPhone extends SimpleInstantInteraction {
         });
     }
 
-    /** Generates a device ID in the format {@code XXX-XXXX}. */
-    private static String generatePhoneNumber() {
-        String id;
-        do {
-            int prefix = 100 + RANDOM.nextInt(900);
-            int suffix = RANDOM.nextInt(10_000);
-            id = String.format("%03d-%04d", prefix, suffix);
-        } while (PhoneRegistry.getOnlineEntry(id) != null);
-        return id;
-    }
 }

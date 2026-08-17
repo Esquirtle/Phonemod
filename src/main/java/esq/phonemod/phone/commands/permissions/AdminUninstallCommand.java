@@ -69,22 +69,22 @@ final class AdminUninstallCommand extends AbstractPlayerCommand {
             return;
         }
 
-        PhoneRegistry.OnlineEntry entry = PhoneRegistry.getOnlineEntry(devices.get(0));
+        PhoneRegistry.PresenceEntry entry = PhoneRegistry.getPresenceEntry(devices.get(0));
         if (entry == null) {
             context.sendMessage(Message.translation("phonemod.permissions.apps.noDevices")
                     .insert(targetName));
             return;
         }
 
-        int uninstalled = 0;
-        for (String deviceId : devices) {
-            boolean ok = AppInstallService.get().uninstall(entry.ref(), entry.store(), deviceId, appId);
-            if (ok) {
-                uninstalled++;
+        entry.world().execute(() -> {
+            if (!entry.ref().isValid()) return;
+            int uninstalled = 0;
+            for (String deviceId : devices) {
+                if (AppInstallService.get().uninstall(
+                        entry.ref(), entry.store(), deviceId, appId)) uninstalled++;
             }
-        }
-
-        context.sendMessage(Message.translation("phonemod.permissions.apps.uninstall.success")
-                .insert(appId).insert(targetName).insert(String.valueOf(uninstalled)));
+            context.sendMessage(Message.translation("phonemod.permissions.apps.uninstall.success")
+                    .insert(appId).insert(targetName).insert(String.valueOf(uninstalled)));
+        });
     }
 }

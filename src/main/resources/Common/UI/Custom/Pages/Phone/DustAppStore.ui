@@ -1,0 +1,28 @@
+// App Store root — composed entirely from DustLib.
+// Four-tab layout: Installed / Available / Restricted / System.
+// Themeable: #AppStoreHeader (appHeader), #AppStorePanel (appPanel),
+//            #AppStoreList (appContent).
+$D = "../DustLib.ui";
+
+Group {
+  FlexWeight: 1;
+  LayoutMode: Top;
+
+  $D.@DustShellHeader #AppStoreHeader { @Title = "App Store"; }
+
+  // Tab bar — four buttons; AppStoreApp sets Active on the current tab.
+  Group #AppStoreTabBar {
+    Anchor: (Height: 36, Bottom: 4);
+    LayoutMode: Left;
+
+    $D.@DustShellTabButton #TabInstalled  { Text: "Installed"; FlexWeight: 1; }
+    $D.@DustShellTabButton #TabAvailable  { Text: "Available"; FlexWeight: 1; }
+    $D.@DustShellTabButton #TabRestricted { Text: "Restricted"; FlexWeight: 1; }
+    $D.@DustShellTabButton #TabSystem     { Text: "System"; FlexWeight: 1; }
+  }
+
+  $D.@DustShellPanel #AppStorePanel {
+    FlexWeight: 1;
+    $D.@DustScrollList #AppStoreList { }
+  }
+}

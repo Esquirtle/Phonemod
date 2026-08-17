@@ -23,6 +23,7 @@ import java.util.List;
 public final class RoomState {
 
     public String id;
+    public int schemaVersion;
     public String name;
     /** Free-form lifecycle marker, e.g. {@code "waiting"} / {@code "active"}. */
     public String status;
@@ -32,6 +33,7 @@ public final class RoomState {
     /** Required by {@link BuilderCodec}. */
     public RoomState() {
         this.id = "";
+        this.schemaVersion = 2;
         this.name = "";
         this.status = "waiting";
         this.capacity = 0;
@@ -59,6 +61,8 @@ public final class RoomState {
 
     public static final BuilderCodec<RoomState> CODEC = BuilderCodec
             .builder(RoomState.class, RoomState::new)
+            .append(new KeyedCodec<>("SchemaVersion", Codec.INTEGER, true),
+                    (o, v) -> o.schemaVersion = v, o -> o.schemaVersion).add()
             .append(new KeyedCodec<>("Id", Codec.STRING), (o, v) -> o.id = v, o -> o.id)
             .add()
             .append(new KeyedCodec<>("Name", Codec.STRING), (o, v) -> o.name = v, o -> o.name)

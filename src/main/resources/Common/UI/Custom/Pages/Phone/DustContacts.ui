@@ -1,0 +1,85 @@
+// Contacts app rendered with the Dust component library.
+//
+// SINGLE-ROOT contract — this one document owns BOTH the contacts-list view and
+// the add-contact form. The Java app never swaps the shell content area; it only
+// toggles child visibility (#ContactsListView vs #ContactsAddView) and re-fills
+// #ContactsList. This keeps the themed selectors (#ContactsHeader /
+// #ContactsPanel / #ContactsList) alive at all times — replacing the root
+// previously left theme re-application targeting dead selectors.
+//
+//   #ContactsHeader     @DustShellHeader — "Contacts"
+//   #AddContactButton   reveals the add form
+//   #ContactsPanel      themed panel surface (role: appPanel)
+//     #ContactsListView   list view (visible by default)
+//       #ContactsList       scrolling contact rows (role: appContent)
+//     #ContactsAddView    add-contact form (hidden until #AddContactButton)
+//       #NumberInput / #NameInput / #SaveButton / #CancelButton
+$D = "../DustLib.ui";
+$C = "../Common.ui";
+
+Group {
+  FlexWeight: 1;
+  LayoutMode: Top;
+
+  $D.@DustShellHeader #ContactsHeader { @Title = "Contacts"; }
+
+  // Add-contact action. Kept as a top-level sibling (not embedded in the header
+  // template) so we only override the button instance's own properties. The app
+  // hides this while the add form is open.
+  $D.@DustShellSecondaryButton #AddContactButton {
+    Anchor: (Height: 32, Bottom: $D.@DustShellSpacing);
+    Text: "Add Contact";
+  }
+
+  $D.@DustShellPanel #ContactsPanel {
+    FlexWeight: 1;
+
+    // ── List view (default) ─────────────────────────────────────────────────
+    Group #ContactsListView {
+      FlexWeight: 1;
+      LayoutMode: Top;
+
+      // Scrolling contacts list. Themeable background (role: appContent).
+      $D.@DustScrollList #ContactsList {
+        Padding: (Full: $D.@DustPanelPadding);
+      }
+    }
+
+    // ── Add-contact form (hidden until #AddContactButton) ───────────────────
+    // App reads #NumberInput.Value / #NameInput.Value and binds #SaveButton /
+    // #CancelButton. Lives inside the same root so the panel/theme stays alive.
+    Group #ContactsAddView {
+      Visible: false;
+      FlexWeight: 1;
+      LayoutMode: Top;
+
+      Label {
+        Text: "Phone number";
+        Anchor: (Bottom: 6);
+        Style: (FontSize: 12, TextColor: $D.@DustTextSecondary);
+      }
+      $C.@TextField #NumberInput {
+        Anchor: (Height: $D.@DustTextFieldHeight, Bottom: 12);
+        PlaceholderText: "e.g. 555-1234";
+      }
+
+      Label {
+        Text: "Display name";
+        Anchor: (Bottom: 6);
+        Style: (FontSize: 12, TextColor: $D.@DustTextSecondary);
+      }
+      $C.@TextField #NameInput {
+        Anchor: (Height: $D.@DustTextFieldHeight, Bottom: 16);
+        PlaceholderText: "e.g. Big Tony";
+      }
+
+      Group #FormButtons {
+        LayoutMode: Left;
+        Anchor: (Height: $D.@DustShellActionButtonHeight);
+
+        $D.@DustShellActionButton #SaveButton  { FlexWeight: 1; Anchor: (Right: 6); Text: "Save"; }
+        $D.@DustShellDangerButton #CancelButton { FlexWeight: 1; Text: "Cancel"; }
+      }
+    }
+  }
+}

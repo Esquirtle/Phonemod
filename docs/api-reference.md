@@ -1,4 +1,7 @@
-# API Reference
+# API Reference (legacy v1)
+
+For new integrations use [V2_API.md](V2_API.md). This page documents the deprecated v1
+compatibility surface retained through 2.x.
 
 ## PhoneApp\<S\>
 

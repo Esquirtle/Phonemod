@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import esq.phonemod.phone.messaging.ChatMessage;
+import esq.phonemod.PhoneMod;
 
 import javax.annotation.Nonnull;
 import java.util.Arrays;
@@ -31,6 +32,8 @@ public final class ConversationHistoryComponent implements Component<EntityStore
 
     public static final BuilderCodec<ConversationHistoryComponent> CODEC =
             BuilderCodec.builder(ConversationHistoryComponent.class, ConversationHistoryComponent::new)
+                    .append(new KeyedCodec<>("SchemaVersion", com.hypixel.hytale.codec.Codec.INTEGER, true),
+                            (data, value) -> data.schemaVersion = value, data -> data.schemaVersion).add()
                     .append(
                             new KeyedCodec<>("History",
                                     new MapCodec<>(
@@ -45,6 +48,7 @@ public final class ConversationHistoryComponent implements Component<EntityStore
 
     /** own phone number → contact phone number → ordered message array (oldest first). */
     private Map<String, Map<String, ChatMessage[]>> history;
+    private int schemaVersion = 2;
 
     // ── Constructors ──────────────────────────────────────────────────────────
 
@@ -99,8 +103,13 @@ public final class ConversationHistoryComponent implements Component<EntityStore
                                                     @Nonnull ChatMessage message) {
         Map<String, ChatMessage[]> contacts = history.computeIfAbsent(ownNumber, k -> new HashMap<>());
         ChatMessage[] existing = contacts.getOrDefault(contactNumber, new ChatMessage[0]);
-        ChatMessage[] updated = Arrays.copyOf(existing, existing.length + 1);
-        updated[existing.length] = message;
+        int limit = PhoneMod.config().messagesPerConversation();
+        int retained = Math.min(existing.length, Math.max(0, limit - 1));
+        ChatMessage[] updated = new ChatMessage[retained + 1];
+        if (retained > 0) {
+            System.arraycopy(existing, existing.length - retained, updated, 0, retained);
+        }
+        updated[retained] = message;
         contacts.put(contactNumber, updated);
         return this;
     }
@@ -124,5 +133,10 @@ public final class ConversationHistoryComponent implements Component<EntityStore
     public Iterable<String> getContacts(@Nonnull String ownNumber) {
         Map<String, ChatMessage[]> contacts = history.get(ownNumber);
         return contacts != null ? Collections.unmodifiableSet(contacts.keySet()) : Collections.emptySet();
+    }
+
+    public void remapDevice(@Nonnull String oldAddress, @Nonnull String newAddress) {
+        Map<String, ChatMessage[]> old = history.remove(oldAddress);
+        if (old != null) history.putIfAbsent(newAddress, old);
     }
 }

@@ -10,6 +10,8 @@ import esq.phonemod.phone.api.PhoneEventActions;
 import esq.phonemod.phone.api.PhoneUi;
 import esq.phonemod.phone.components.CallHistoryComponent;
 import esq.phonemod.phone.components.CallRecord;
+import esq.phonemod.device.assets.CallAudioPolicy;
+import esq.phonemod.phone.messaging.CallRegistry;
 
 import javax.annotation.Nonnull;
 import java.time.Instant;
@@ -71,6 +73,10 @@ public final class Calls {
 
     /** Hang-up button on the active-call overlay. */
     public static final String SEL_ACTIVE_HANGUP_BUTTON     = "#HangUpButton";
+    public static final String SEL_SPEAKER_CONTROLS         = "#SpeakerControls";
+    public static final String SEL_SPEAKER_STATUS_TEXT      = "#SpeakerStatus.Text";
+    public static final String SEL_SPEAKER_ON_BUTTON        = "#SpeakerOnButton";
+    public static final String SEL_SPEAKER_OFF_BUTTON       = "#SpeakerOffButton";
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -137,7 +143,8 @@ public final class Calls {
      * Clears {@code #AppContent} and renders the active-call overlay.
      * {@code #HangUpButton} fires {@code hang_up}.
      */
-    public static void loadActiveCallState(@Nonnull String partnerNumber,
+    public static void loadActiveCallState(@Nonnull String ownNumber,
+            @Nonnull String partnerNumber,
             @Nonnull String partnerName,
             @Nonnull String contentSelector,
             @Nonnull UICommandBuilder cmd,
@@ -147,5 +154,14 @@ public final class Calls {
         PhoneUi.setText(cmd, SEL_ACTIVE_PARTNER_TEXT, partnerName + " (" + partnerNumber + ")");
 
         PhoneUi.bindAction(evb, SEL_ACTIVE_HANGUP_BUTTON, PhoneEventActions.HANG_UP);
+        boolean toggleable = CallRegistry.isInCall(ownNumber)
+                && CallRegistry.getAudioPolicy(ownNumber) == CallAudioPolicy.TOGGLEABLE;
+        PhoneUi.setVisible(cmd, SEL_SPEAKER_CONTROLS, toggleable);
+        if (toggleable) {
+            PhoneUi.setText(cmd, SEL_SPEAKER_STATUS_TEXT,
+                    CallRegistry.isSpeakerEnabled(ownNumber) ? "Speaker is ON" : "Call is PRIVATE");
+            PhoneUi.bindAction(evb, SEL_SPEAKER_ON_BUTTON, PhoneEventActions.SPEAKER_ON);
+            PhoneUi.bindAction(evb, SEL_SPEAKER_OFF_BUTTON, PhoneEventActions.SPEAKER_OFF);
+        }
     }
 }

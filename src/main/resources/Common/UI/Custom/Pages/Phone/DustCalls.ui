@@ -1,0 +1,41 @@
+// Calls app rendered with the Dust component library.
+// Root contract: #DialInput, #DialButton, #CallHistoryList.
+// Panels are raw Groups (token-styled); only the header + buttons are template
+// instances, customized via the supported named-expression / root-property paths.
+$D = "../DustLib.ui";
+
+Group {
+  FlexWeight: 1;
+  LayoutMode: Top;
+
+  $D.@DustShellHeader #CallsHeader { @Title = "Calls"; }
+
+  $D.@DustShellPanel #CallsPanel {
+    FlexWeight: 1;
+
+    // Dialer row: number field + call button.
+    // (Child gaps come from Anchor margins; .ui has no element-level Spacing.)
+    Group #DialRow {
+      LayoutMode: Left;
+      Anchor: (Height: $D.@DustShellInputRowHeight, Bottom: $D.@DustShellSpacing);
+      Background: $D.@DustShellInputBackground;
+      Padding: (Full: 8);
+
+      TextField #DialInput {
+        FlexWeight: 1;
+        Anchor: (Height: $D.@DustTextFieldHeight, Right: $D.@DustShellSpacing);
+        PlaceholderText: "Enter number...";
+      }
+
+      $D.@DustShellActionButton #DialButton {
+        Anchor: (Width: 74, Height: $D.@DustTextFieldHeight);
+        Text: "Call";
+      }
+    }
+
+    // Scrolling call history. Themeable background (role: appContent).
+    $D.@DustScrollList #CallHistoryList {
+      Padding: (Full: $D.@DustPanelPadding);
+    }
+  }
+}

@@ -7,442 +7,380 @@ import com.hypixel.hytale.protocol.Position;
 import com.hypixel.hytale.protocol.packets.stream.StreamType;
 import com.hypixel.hytale.protocol.packets.voice.RelayedVoiceData;
 import com.hypixel.hytale.protocol.packets.voice.VoiceData;
+import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.io.adapter.PlayerPacketFilter;
 import com.hypixel.hytale.server.core.modules.voice.VoiceModule;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import esq.phonemod.phone.components.CallHistoryComponent;
-import esq.phonemod.phone.components.CallRecord;
+import esq.phonemod.PhoneMod;
+import esq.phonemod.device.assets.CallAudioPolicy;
 import esq.phonemod.device.events.PhoneCallAnsweredEvent;
 import esq.phonemod.device.events.PhoneCallEndedEvent;
 import esq.phonemod.device.events.PhoneCallMissedEvent;
 import esq.phonemod.device.events.PhoneCallStartedEvent;
 import esq.phonemod.device.events.PhoneEvents;
+import esq.phonemod.phone.components.CallHistoryComponent;
+import esq.phonemod.phone.components.CallRecord;
+import esq.phonemod.security.TokenBucket;
+import esq.phonemod.operations.OperationalMetrics;
+import esq.phonemod.api.event.CallTransitionEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Manages phone call state and performs private voice routing between call parties.
- *
- * <h3>Call flow</h3>
- * <ol>
- *   <li>{@link #initiateCall} — caller presses Call; if callee is online their UI shows incoming call.</li>
- *   <li>{@link #answerCall} — callee taps Answer; both UIs switch to active-call view.</li>
- *   <li>{@link #hangUp} — either party ends the call; history is persisted on both sides.</li>
- * </ol>
- *
- * <h3>Voice routing</h3>
- * {@link #VOICE_FILTER} is registered globally via {@code PacketAdapters.registerInbound}.
- * When a player speaking is in an active call, their {@link VoiceData} packet is intercepted,
- * relayed as {@link RelayedVoiceData} directly to the call partner's voice channel, and the
- * original packet is cancelled so normal proximity routing does NOT fire.
- */
+/** Atomic call state and immutable Netty-thread voice routes. */
 public final class CallRegistry {
-
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
-
-    /** phoneNumber → phoneNumber (both directions when a call is active). */
-    private static final ConcurrentHashMap<String, String> activeCalls = new ConcurrentHashMap<>();
-
-    /** callerNumber → calleeNumber during the ringing phase. */
-    private static final ConcurrentHashMap<String, String> pendingCalls = new ConcurrentHashMap<>();
-
-    /** callerNumber → epoch-ms the ring started, for ring-timeout enforcement. */
-    private static final ConcurrentHashMap<String, Long> pendingSince = new ConcurrentHashMap<>();
-
-    /** How long an unanswered outgoing call rings before it is auto-cancelled as missed. */
-    private static final long RING_TIMEOUT_MS = 30_000L;
-
-    /** How often the timeout watcher scans for expired rings. */
+    private static final Object MUTEX = new Object();
+    /** Both endpoint keys point at the same session while reserved. */
+    private static final Map<String, CallSession> BY_ENDPOINT = new HashMap<>();
+    private static final ConcurrentHashMap<String, TokenBucket> ATTEMPT_LIMITERS =
+            new ConcurrentHashMap<>();
+    private static final AtomicReference<Map<UUID, VoiceRoute>> VOICE_ROUTES =
+            new AtomicReference<>(Map.of());
     private static final long TIMEOUT_SCAN_SECONDS = 2L;
-
-    /** Radius (in blocks) within which bystanders near the call recipient can hear the phone speaker. */
-    private static final double PHONE_SPEAKER_RADIUS = 8.0;
-
-    /** Background watcher that auto-cancels unanswered rings; started by {@link #startTimeoutWatcher()}. */
-    @Nullable
-    private static volatile ScheduledExecutorService timeoutWatcher;
+    @Nullable private static volatile ScheduledFuture<?> timeoutWatcher;
 
     private CallRegistry() {}
 
-    // ── Ring-timeout watcher ────────────────────────────────────────────────────
-
-    /**
-     * Starts the background watcher that auto-cancels rings unanswered after
-     * {@link #RING_TIMEOUT_MS}. Idempotent. Called from the plugin's runtime init.
-     */
     public static synchronized void startTimeoutWatcher() {
-        if (timeoutWatcher != null) {
-            return;
-        }
-        ScheduledExecutorService exec = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "phonemod-call-timeout");
-            t.setDaemon(true);
-            return t;
-        });
-        exec.scheduleWithFixedDelay(CallRegistry::checkTimeouts,
+        if (timeoutWatcher != null) return;
+        timeoutWatcher = HytaleServer.SCHEDULED_EXECUTOR.scheduleWithFixedDelay(
+                CallRegistry::checkTimeouts,
                 TIMEOUT_SCAN_SECONDS, TIMEOUT_SCAN_SECONDS, TimeUnit.SECONDS);
-        timeoutWatcher = exec;
     }
 
-    /** Stops the ring-timeout watcher. Idempotent. Called from the plugin's shutdown. */
     public static synchronized void stopTimeoutWatcher() {
-        ScheduledExecutorService exec = timeoutWatcher;
-        if (exec != null) {
-            exec.shutdownNow();
-            timeoutWatcher = null;
+        ScheduledFuture<?> watcher = timeoutWatcher;
+        timeoutWatcher = null;
+        if (watcher != null) watcher.cancel(false);
+        Set<CallSession> sessions;
+        synchronized (MUTEX) {
+            sessions = new HashSet<>(BY_ENDPOINT.values());
         }
+        for (CallSession session : sessions) {
+            endSession(session, CallSession.EndReason.SHUTDOWN, session.caller());
+        }
+        ATTEMPT_LIMITERS.clear();
+        VOICE_ROUTES.set(Map.of());
     }
 
-    /**
-     * Cancels any pending call that has been ringing longer than {@link #RING_TIMEOUT_MS}.
-     * Runs off the world thread; {@link #hangUp} is thread-safe and marshals UI work onto
-     * the relevant world thread itself.
-     */
     private static void checkTimeouts() {
         long now = System.currentTimeMillis();
-        List<String> expired = null;
-        for (Map.Entry<String, Long> entry : pendingSince.entrySet()) {
-            if (now - entry.getValue() >= RING_TIMEOUT_MS) {
-                if (expired == null) expired = new ArrayList<>();
-                expired.add(entry.getKey());
-            }
+        Set<CallSession> sessions;
+        synchronized (MUTEX) {
+            sessions = new HashSet<>(BY_ENDPOINT.values());
         }
-        if (expired == null) {
-            return;
-        }
-        for (String callerNumber : expired) {
-            // Only time out if still pending (not answered/cancelled in the meantime).
-            if (pendingCalls.containsKey(callerNumber)) {
-                LOGGER.atFine().log("[CallRegistry] Ring timed out for %s; cancelling", callerNumber);
-                hangUp(callerNumber);
-            } else {
-                pendingSince.remove(callerNumber);
+        for (CallSession session : sessions) {
+            if (session.state() == CallSession.State.RINGING
+                    && now - session.createdAtMillis()
+                    >= TimeUnit.SECONDS.toMillis(PhoneMod.config().callRingTimeoutSeconds())) {
+                endSession(session, CallSession.EndReason.TIMEOUT, session.caller());
             }
         }
     }
 
-    // ── Voice intercept ───────────────────────────────────────────────────────
-
-    /**
-     * Global {@link PlayerPacketFilter} that intercepts {@link VoiceData} packets.
-     * When the speaking player is in an active phone call:
-     * <ol>
-     *   <li>Audio is relayed privately to the call partner (speakerPosition = caller's real
-     *       position, so the partner hears the caller directionally).</li>
-     *   <li>Audio is also broadcast spatially to any player within {@link #PHONE_SPEAKER_RADIUS}
-     *       blocks of the <em>recipient</em>, with speakerPosition set to the recipient's
-     *       position — simulating the phone playing out loud.</li>
-     * </ol>
-     * The original packet is cancelled so the caller's proximity voice is suppressed.
-     */
-    public static final PlayerPacketFilter VOICE_FILTER = (playerRef, packet) -> {
+    public static final PlayerPacketFilter VOICE_FILTER = (speakerRef, packet) -> {
         if (!(packet instanceof VoiceData voiceData)) return false;
+        VoiceRoute route = VOICE_ROUTES.get().get(speakerRef.getUuid());
+        if (route == null) return false;
 
-        // Find which of this player's phone numbers is in an active call
-        String callerNumber = null;
-        for (String number : PhoneRegistry.getPhoneNumbersByUuid(playerRef.getUuid())) {
-            if (activeCalls.containsKey(number)) {
-                callerNumber = number;
-                break;
-            }
+        VoiceModule voice = VoiceModule.get();
+        if (!voice.isVoiceEnabled() || voice.isPlayerMuted(speakerRef.getUuid())
+                || voiceData.opusData == null || voiceData.opusData.length > voice.getMaxPacketSize()) {
+            return true;
         }
-        if (callerNumber == null) return false;
+        VoiceModule.PositionSnapshot speakerPosition = voice.getCachedPosition(speakerRef.getUuid());
+        VoiceModule.PositionSnapshot receiverPosition =
+                voice.getCachedPosition(route.receiver().getUuid());
 
-        String partnerNumber = activeCalls.get(callerNumber);
-        if (partnerNumber == null) return false;
+        RelayedVoiceData relay = relay(voiceData, speakerRef, speakerPosition);
+        var receiverChannel = route.receiver().getPacketHandler().getChannel(StreamType.Voice);
+        if (receiverChannel != null && receiverChannel.isActive()) receiverChannel.writeAndFlush(relay);
 
-        PhoneRegistry.OnlineEntry partnerEntry = PhoneRegistry.getOnlineEntry(partnerNumber);
-        if (partnerEntry == null) return true; // partner offline — block but don't route
-
-        VoiceModule voiceMod = VoiceModule.get();
-        if (!voiceMod.isVoiceEnabled()) return true;
-        if (voiceMod.isPlayerMuted(playerRef.getUuid())) return true;
-        if (voiceData.opusData == null || voiceData.opusData.length > voiceMod.getMaxPacketSize()) return true;
-
-        VoiceModule.PositionSnapshot callerPos  = voiceMod.getCachedPosition(playerRef.getUuid());
-        VoiceModule.PositionSnapshot partnerPos = voiceMod.getCachedPosition(partnerEntry.playerRef().getUuid());
-
-        // ── 1. Private relay to call partner ──────────────────────────────────
-        // speakerPosition = caller's real position → partner hears caller directionally.
-        RelayedVoiceData privateRelay = new RelayedVoiceData();
-        privateRelay.speakerId     = playerRef.getUuid();
-        privateRelay.sequenceNumber = voiceData.sequenceNumber;
-        privateRelay.timestamp     = voiceData.timestamp;
-        privateRelay.opusData      = voiceData.opusData;
-        if (callerPos != null) {
-            privateRelay.entityId            = callerPos.networkId();
-            privateRelay.speakerPosition     = new Position(callerPos.x(), callerPos.y(), callerPos.z());
-            privateRelay.speakerIsUnderwater = callerPos.isUnderwater();
-        }
-        var partnerVoiceChannel = partnerEntry.playerRef().getPacketHandler().getChannel(StreamType.Voice);
-        if (partnerVoiceChannel != null && partnerVoiceChannel.isActive()) {
-            partnerVoiceChannel.writeAndFlush(privateRelay);
-        }
-
-        // ── 2. Spatial bystander relay (phone speaker simulation) ─────────────
-        // speakerPosition = recipient's position → bystanders near the recipient
-        // hear the audio as if it's emitting from the phone in their hand.
-        if (partnerPos != null) {
-            RelayedVoiceData speakerRelay = new RelayedVoiceData();
-            speakerRelay.speakerId       = playerRef.getUuid();
-            speakerRelay.sequenceNumber  = voiceData.sequenceNumber;
-            speakerRelay.timestamp       = voiceData.timestamp;
-            speakerRelay.opusData        = voiceData.opusData;
-            speakerRelay.entityId        = partnerPos.networkId();
-            speakerRelay.speakerPosition = new Position(partnerPos.x(), partnerPos.y(), partnerPos.z());
-            speakerRelay.speakerIsUnderwater = partnerPos.isUnderwater();
-
-            double radiusSq = PHONE_SPEAKER_RADIUS * PHONE_SPEAKER_RADIUS;
-            for (var bystander : Universe.get().getPlayers()) {
-                // Skip the two call participants — partner already received privateRelay
-                if (bystander.getUuid().equals(playerRef.getUuid())) continue;
-                if (bystander.getUuid().equals(partnerEntry.playerRef().getUuid())) continue;
-
-                VoiceModule.PositionSnapshot bystanderPos = voiceMod.getCachedPosition(bystander.getUuid());
-                if (bystanderPos == null) continue;
-                if (bystanderPos.worldId() != partnerPos.worldId()) continue;
-
-                double dx = bystanderPos.x() - partnerPos.x();
-                double dy = bystanderPos.y() - partnerPos.y();
-                double dz = bystanderPos.z() - partnerPos.z();
+        if (route.speakerEnabled() && receiverPosition != null) {
+            RelayedVoiceData speakerRelay = relay(voiceData, speakerRef, receiverPosition);
+            double speakerRadius = PhoneMod.config().speakerRadiusBlocks();
+            double radiusSq = speakerRadius * speakerRadius;
+            for (PlayerRef bystander : Universe.get().getPlayers()) {
+                if (bystander.getUuid().equals(speakerRef.getUuid())
+                        || bystander.getUuid().equals(route.receiver().getUuid())) continue;
+                VoiceModule.PositionSnapshot position = voice.getCachedPosition(bystander.getUuid());
+                if (position == null || position.worldId() != receiverPosition.worldId()) continue;
+                double dx = position.position().x() - receiverPosition.position().x();
+                double dy = position.position().y() - receiverPosition.position().y();
+                double dz = position.position().z() - receiverPosition.position().z();
                 if (dx * dx + dy * dy + dz * dz > radiusSq) continue;
-
-                var bystanderChannel = bystander.getPacketHandler().getChannel(StreamType.Voice);
-                if (bystanderChannel != null && bystanderChannel.isActive()) {
-                    bystanderChannel.writeAndFlush(speakerRelay);
-                }
+                var channel = bystander.getPacketHandler().getChannel(StreamType.Voice);
+                if (channel != null && channel.isActive()) channel.writeAndFlush(speakerRelay);
             }
         }
-
-        return true; // cancel normal proximity routing for the caller
+        return true;
     };
 
-    // ── Call management ───────────────────────────────────────────────────────
+    private static RelayedVoiceData relay(VoiceData source, PlayerRef speaker,
+                                          @Nullable VoiceModule.PositionSnapshot position) {
+        RelayedVoiceData relay = new RelayedVoiceData();
+        relay.speakerId = speaker.getUuid();
+        relay.sequenceNumber = source.sequenceNumber;
+        relay.timestamp = source.timestamp;
+        relay.opusData = source.opusData;
+        if (position != null) {
+            relay.entityId = position.networkId();
+            relay.speakerPosition = new Position(position.position().x(), position.position().y(),
+                    position.position().z());
+            relay.speakerIsUnderwater = position.isUnderwater();
+        }
+        return relay;
+    }
 
-    /**
-     * Starts a call from {@code callerNumber} to {@code calleeNumber}.
-     * If the callee has an open phone, their incoming-call UI is shown.
-     * If the callee is offline, a missed-call record is immediately written to the caller.
-     */
-    public static void initiateCall(@Nonnull String callerNumber,
-                                     @Nonnull String calleeNumber,
-                                     @Nonnull String calleeName) {
-        if (activeCalls.containsKey(callerNumber) || pendingCalls.containsKey(callerNumber)) {
-            LOGGER.atWarning().log("[CallRegistry] %s tried to call while already in/pending a call", callerNumber);
-            return;
+    public static boolean initiateCall(@Nonnull String caller, @Nonnull String callee,
+                                       @Nonnull String calleeName) {
+        if (!PhoneMod.config().callsEnabled()) return false;
+        PhoneRegistry.PresenceEntry callerEntry = PhoneRegistry.getPresenceEntry(caller);
+        PhoneRegistry.PresenceEntry calleeEntry = PhoneRegistry.getPresenceEntry(callee);
+        if (caller.equals(callee) || callerEntry == null || calleeEntry == null
+                || callerEntry.playerRef().getUuid().equals(calleeEntry.playerRef().getUuid())) {
+            recordFailedCall(callerEntry, caller, callee, calleeName);
+            return false;
+        }
+        if (PhoneMod.config().requireOpenDeviceForIncomingCalls()
+                && PhoneRegistry.getOnlineEntry(callee) == null) {
+            recordFailedCall(callerEntry, caller, callee, calleeName);
+            return false;
+        }
+        if (!PhoneRegistry.getPreferences(callee).incomingCallsEnabled()) {
+            recordFailedCall(callerEntry, caller, callee, calleeName);
+            return false;
+        }
+        if (!PhoneMod.config().allowCrossWorldCalls()
+                && callerEntry.world() != calleeEntry.world()) {
+            recordFailedCall(callerEntry, caller, callee, calleeName);
+            return false;
+        }
+        TokenBucket limiter = ATTEMPT_LIMITERS.computeIfAbsent(caller, ignored ->
+                new TokenBucket(1.0 / PhoneMod.config().callAttemptIntervalSeconds(), 1));
+        if (!limiter.tryAcquire()) {
+            OperationalMetrics.get().rateLimited();
+            return false;
         }
 
-        PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
-        PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(calleeNumber);
-        PhoneEvents.post(new PhoneCallStartedEvent(callerNumber, calleeNumber));
+        CallTransitionEvent.Pre pre = HytaleServer.get().getEventBus()
+                .dispatchFor(CallTransitionEvent.Pre.class)
+                .dispatch(new CallTransitionEvent.Pre(caller, callee,
+                        CallTransitionEvent.Transition.RINGING));
+        if (pre.isCancelled()) return false;
 
-        if (calleeEntry == null) {
-            // Callee offline — log missed on callee side when possible, failed on caller side
-            LOGGER.atFine().log("[CallRegistry] Callee %s offline; call from %s failed", calleeNumber, callerNumber);
-            if (callerEntry != null) {
-                callerEntry.world().execute(() -> {
-                    persistRecord(callerEntry.store(), callerEntry.ref(), callerNumber,
-                            new CallRecord(calleeNumber, calleeName, System.currentTimeMillis(), true, true));
-                    callerEntry.page().onCallEnded();
-                });
-            }
-            PhoneEvents.post(new PhoneCallMissedEvent(calleeNumber, callerNumber));
-            return;
+        CallAudioPolicy policy = resolvePolicy(caller);
+        CallSession session = new CallSession(caller, callee, calleeName,
+                System.currentTimeMillis(), policy);
+        synchronized (MUTEX) {
+            if (BY_ENDPOINT.containsKey(caller) || BY_ENDPOINT.containsKey(callee)) return false;
+            BY_ENDPOINT.put(caller, session);
+            BY_ENDPOINT.put(callee, session);
         }
+        PhoneEvents.post(new PhoneCallStartedEvent(caller, callee));
+        HytaleServer.get().getEventBus().dispatchFor(CallTransitionEvent.Post.class)
+                .dispatch(new CallTransitionEvent.Post(caller, callee,
+                        CallTransitionEvent.Transition.RINGING));
+        notifyPage(callee, page -> page.onIncomingCall(caller, caller));
+        notifyPage(caller, page -> page.onOutgoingCall(callee, calleeName));
+        return true;
+    }
 
-        pendingCalls.put(callerNumber, calleeNumber);
-        pendingSince.put(callerNumber, System.currentTimeMillis());
-        LOGGER.atFine().log("[CallRegistry] Call pending: %s → %s", callerNumber, calleeNumber);
+    private static CallAudioPolicy resolvePolicy(String endpoint) {
+        CallAudioPolicy assetPolicy = CallAudioPolicy.PRIVATE;
+        PhoneRegistry.OnlineEntry open = PhoneRegistry.getOnlineEntry(endpoint);
+        if (open != null && open.page() instanceof esq.phonemod.device.ui.DevicePage page) {
+            assetPolicy = page.getSession().getShell().getCallAudioPolicy();
+        }
+        return PhoneMod.config().callAudioMode().resolve(assetPolicy);
+    }
 
-        // Ring the callee.
-        calleeEntry.world().execute(() ->
-                calleeEntry.page().onIncomingCall(callerNumber, callerNumber));
+    public static boolean answerCall(@Nonnull String callee) {
+        CallSession session;
+        synchronized (MUTEX) {
+            session = BY_ENDPOINT.get(callee);
+            if (session == null || !session.answer(callee)) return false;
+            rebuildVoiceRoutesLocked();
+        }
+        PhoneEvents.post(new PhoneCallAnsweredEvent(session.caller(), session.callee()));
+        PhoneEvents.post(new PhoneCallAnsweredEvent(session.callee(), session.caller()));
+        HytaleServer.get().getEventBus().dispatchFor(CallTransitionEvent.Post.class)
+                .dispatch(new CallTransitionEvent.Post(session.caller(), session.callee(),
+                        CallTransitionEvent.Transition.ANSWERED));
+        notifyPage(session.caller(), page -> page.onCallAnswered(session.callee(), session.callee()));
+        notifyPage(session.callee(), page -> page.onCallAnswered(session.caller(), session.caller()));
+        return true;
+    }
 
-        // Show the caller a "Calling…" view while the callee's phone rings.
-        if (callerEntry != null) {
-            callerEntry.world().execute(() ->
-                    callerEntry.page().onOutgoingCall(calleeNumber, calleeName));
+    public static boolean setSpeaker(@Nonnull String endpoint, boolean enabled) {
+        CallSession session;
+        synchronized (MUTEX) {
+            session = BY_ENDPOINT.get(endpoint);
+            if (session == null || !session.setSpeaker(endpoint, enabled)) return false;
+            rebuildVoiceRoutesLocked();
+        }
+        notifyPage(session.caller(), page -> page.onCallAnswered(
+                session.callee(), session.callee()));
+        notifyPage(session.callee(), page -> page.onCallAnswered(
+                session.caller(), session.caller()));
+        return true;
+    }
+
+    public static void hangUp(@Nonnull String endpoint) {
+        CallSession session;
+        synchronized (MUTEX) {
+            session = BY_ENDPOINT.get(endpoint);
+        }
+        if (session == null) return;
+        CallSession.EndReason reason = session.state() == CallSession.State.ACTIVE
+                ? CallSession.EndReason.HANGUP
+                : (session.callee().equals(endpoint)
+                    ? CallSession.EndReason.DECLINED : CallSession.EndReason.CANCELLED);
+        endSession(session, reason, endpoint);
+    }
+
+    private static void endSession(CallSession session, CallSession.EndReason reason, String actor) {
+        CallSession.State prior;
+        synchronized (MUTEX) {
+            if (BY_ENDPOINT.get(session.caller()) != session
+                    || BY_ENDPOINT.get(session.callee()) != session) return;
+            prior = session.state();
+            if (!session.end(reason)) return;
+            BY_ENDPOINT.remove(session.caller(), session);
+            BY_ENDPOINT.remove(session.callee(), session);
+            rebuildVoiceRoutesLocked();
+        }
+        long timestamp = System.currentTimeMillis();
+        boolean missed = prior == CallSession.State.RINGING;
+        persistAndClose(session.caller(), session.callee(), session.calleeName(), timestamp, true, missed);
+        persistAndClose(session.callee(), session.caller(), session.caller(), timestamp, false, missed);
+        if (missed) PhoneEvents.post(new PhoneCallMissedEvent(session.callee(), session.caller()));
+        else {
+            PhoneEvents.post(new PhoneCallEndedEvent(session.caller(), session.callee()));
+            PhoneEvents.post(new PhoneCallEndedEvent(session.callee(), session.caller()));
+        }
+        HytaleServer.get().getEventBus().dispatchFor(CallTransitionEvent.Post.class)
+                .dispatch(new CallTransitionEvent.Post(session.caller(), session.callee(),
+                        missed ? CallTransitionEvent.Transition.MISSED
+                                : CallTransitionEvent.Transition.ENDED));
+    }
+
+    private static void recordFailedCall(@Nullable PhoneRegistry.PresenceEntry entry,
+                                         String caller, String callee, String calleeName) {
+        if (entry != null) {
+            entry.world().execute(() -> persistRecord(entry.store(), entry.ref(), caller,
+                    new CallRecord(callee, calleeName, System.currentTimeMillis(), true, true)));
+        }
+        PhoneEvents.post(new PhoneCallMissedEvent(callee, caller));
+        notifyPage(caller, esq.phonemod.device.api.DevicePageHandle::onCallEnded);
+    }
+
+    private static void persistAndClose(String own, String partner, String partnerName,
+                                        long timestamp, boolean outgoing, boolean missed) {
+        PhoneRegistry.PresenceEntry entry = PhoneRegistry.getPresenceEntry(own);
+        if (entry != null) {
+            entry.world().execute(() -> persistRecord(entry.store(), entry.ref(), own,
+                    new CallRecord(partner, partnerName, timestamp, outgoing, missed)));
+        }
+        notifyPage(own, esq.phonemod.device.api.DevicePageHandle::onCallEnded);
+    }
+
+    private static void notifyPage(String endpoint,
+            java.util.function.Consumer<esq.phonemod.device.api.DevicePageHandle> notification) {
+        PhoneRegistry.OnlineEntry entry = PhoneRegistry.getOnlineEntry(endpoint);
+        if (entry != null) entry.world().execute(() -> notification.accept(entry.page()));
+    }
+
+    private static void rebuildVoiceRoutesLocked() {
+        Map<UUID, VoiceRoute> routes = new HashMap<>();
+        Set<CallSession> sessions = new HashSet<>(BY_ENDPOINT.values());
+        for (CallSession session : sessions) {
+            if (session.state() != CallSession.State.ACTIVE) continue;
+            PhoneRegistry.PresenceEntry caller = PhoneRegistry.getPresenceEntry(session.caller());
+            PhoneRegistry.PresenceEntry callee = PhoneRegistry.getPresenceEntry(session.callee());
+            if (caller == null || callee == null) continue;
+            routes.put(caller.playerRef().getUuid(),
+                    new VoiceRoute(callee.playerRef(), session.speakerEnabled()));
+            routes.put(callee.playerRef().getUuid(),
+                    new VoiceRoute(caller.playerRef(), session.speakerEnabled()));
+        }
+        VOICE_ROUTES.set(Map.copyOf(routes));
+    }
+
+    public static void cleanupOnDisconnect(@Nonnull String endpoint) {
+        CallSession session;
+        synchronized (MUTEX) { session = BY_ENDPOINT.get(endpoint); }
+        if (session != null) endSession(session, CallSession.EndReason.DISCONNECT, endpoint);
+    }
+
+    public static boolean isInCall(@Nonnull String endpoint) {
+        synchronized (MUTEX) {
+            CallSession session = BY_ENDPOINT.get(endpoint);
+            return session != null && session.state() == CallSession.State.ACTIVE;
         }
     }
 
-    /**
-     * Called when the callee taps Answer.
-     * Finds who is calling {@code calleeNumber}, promotes to active, and notifies both pages.
-     */
-    public static void answerCall(@Nonnull String calleeNumber) {
-        String callerNumber = getCallerFor(calleeNumber);
-        if (callerNumber == null) {
-            LOGGER.atWarning().log("[CallRegistry] answerCall: no pending caller for %s", calleeNumber);
-            return;
-        }
-        pendingCalls.remove(callerNumber);
-        pendingSince.remove(callerNumber);
-        activeCalls.put(callerNumber, calleeNumber);
-        activeCalls.put(calleeNumber, callerNumber);
-        LOGGER.atFine().log("[CallRegistry] Call connected: %s ↔ %s", callerNumber, calleeNumber);
-        PhoneEvents.post(new PhoneCallAnsweredEvent(callerNumber, calleeNumber));
-        PhoneEvents.post(new PhoneCallAnsweredEvent(calleeNumber, callerNumber));
-
-        PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
-        PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(calleeNumber);
-        if (callerEntry != null) {
-            callerEntry.world().execute(() -> callerEntry.page().onCallAnswered(calleeNumber, calleeNumber));
-        }
-        if (calleeEntry != null) {
-            calleeEntry.world().execute(() -> calleeEntry.page().onCallAnswered(callerNumber, callerNumber));
+    @Nullable public static CallAudioPolicy getAudioPolicy(@Nonnull String endpoint) {
+        synchronized (MUTEX) {
+            CallSession session = BY_ENDPOINT.get(endpoint);
+            return session != null ? session.audioPolicy() : null;
         }
     }
 
-    /**
-     * Ends any active or pending call involving {@code number}. Persists call records and
-     * notifies the other party. Safe to call from any thread.
-     */
-    public static void hangUp(@Nonnull String number) {
-        // End active call
-        String partnerNumber = activeCalls.remove(number);
-        if (partnerNumber != null) {
-            activeCalls.remove(partnerNumber);
-            LOGGER.atFine().log("[CallRegistry] Call ended: %s ↔ %s", number, partnerNumber);
-            PhoneEvents.post(new PhoneCallEndedEvent(number, partnerNumber));
-            PhoneEvents.post(new PhoneCallEndedEvent(partnerNumber, number));
-            long ts = System.currentTimeMillis();
-
-            PhoneRegistry.OnlineEntry myEntry      = PhoneRegistry.getOnlineEntry(number);
-            PhoneRegistry.OnlineEntry partnerEntry = PhoneRegistry.getOnlineEntry(partnerNumber);
-
-            if (myEntry != null) {
-                final String pNum = partnerNumber;
-                myEntry.world().execute(() -> {
-                    persistRecord(myEntry.store(), myEntry.ref(), number,
-                            new CallRecord(pNum, pNum, ts, true, false));
-                    myEntry.page().onCallEnded();
-                });
-            }
-            if (partnerEntry != null) {
-                final String n = number;
-                partnerEntry.world().execute(() -> {
-                    persistRecord(partnerEntry.store(), partnerEntry.ref(), partnerNumber,
-                            new CallRecord(n, n, ts, false, false));
-                    partnerEntry.page().onCallEnded();
-                });
-            }
-            return;
-        }
-
-        // Decline pending call (callee declining)
-        String callerNumber = getCallerFor(number);
-        if (callerNumber != null) {
-            pendingCalls.remove(callerNumber);
-            pendingSince.remove(callerNumber);
-            LOGGER.atFine().log("[CallRegistry] Call declined (%s → %s)", callerNumber, number);
-            PhoneEvents.post(new PhoneCallMissedEvent(number, callerNumber));
-            long ts = System.currentTimeMillis();
-
-            PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(callerNumber);
-            PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(number);
-            if (callerEntry != null) {
-                final String n = number;
-                callerEntry.world().execute(() -> {
-                    persistRecord(callerEntry.store(), callerEntry.ref(), callerNumber,
-                            new CallRecord(n, n, ts, true, true));
-                    callerEntry.page().onCallEnded();
-                });
-            }
-            if (calleeEntry != null) {
-                calleeEntry.world().execute(() -> calleeEntry.page().onCallEnded());
-            }
-            return;
-        }
-
-        // Cancel pending call (caller hanging up before answer, or ring timeout)
-        String calleeNumber = pendingCalls.remove(number);
-        pendingSince.remove(number);
-        if (calleeNumber != null) {
-            LOGGER.atFine().log("[CallRegistry] Call cancelled by caller (%s → %s)", number, calleeNumber);
-            PhoneEvents.post(new PhoneCallMissedEvent(calleeNumber, number));
-            long ts = System.currentTimeMillis();
-
-            // Record the cancelled outgoing attempt on the caller's history.
-            PhoneRegistry.OnlineEntry callerEntry = PhoneRegistry.getOnlineEntry(number);
-            if (callerEntry != null) {
-                final String cNum = calleeNumber;
-                callerEntry.world().execute(() -> {
-                    persistRecord(callerEntry.store(), callerEntry.ref(), number,
-                            new CallRecord(cNum, cNum, ts, true, true));
-                    callerEntry.page().onCallEnded();
-                });
-            }
-            // Record a missed incoming call on the callee's history and clear their ring UI.
-            PhoneRegistry.OnlineEntry calleeEntry = PhoneRegistry.getOnlineEntry(calleeNumber);
-            if (calleeEntry != null) {
-                final String n = number;
-                calleeEntry.world().execute(() -> {
-                    persistRecord(calleeEntry.store(), calleeEntry.ref(), calleeNumber,
-                            new CallRecord(n, n, ts, false, true));
-                    calleeEntry.page().onCallEnded();
-                });
-            }
+    public static boolean isSpeakerEnabled(@Nonnull String endpoint) {
+        synchronized (MUTEX) {
+            CallSession session = BY_ENDPOINT.get(endpoint);
+            return session != null && session.speakerEnabled();
         }
     }
 
-    /** Cleans up any calls for a disconnecting player (by phone number). */
-    public static void cleanupOnDisconnect(@Nonnull String phoneNumber) {
-        if (activeCalls.containsKey(phoneNumber) || pendingCalls.containsKey(phoneNumber)
-                || getCallerFor(phoneNumber) != null) {
-            hangUp(phoneNumber);
+    public static int activeSessionCount() {
+        synchronized (MUTEX) { return new HashSet<>(BY_ENDPOINT.values()).size(); }
+    }
+
+    @Nullable public static String getActivePartner(@Nonnull String endpoint) {
+        synchronized (MUTEX) {
+            CallSession session = BY_ENDPOINT.get(endpoint);
+            return session != null && session.state() == CallSession.State.ACTIVE
+                    ? session.partnerOf(endpoint) : null;
         }
     }
 
-    public static boolean isInCall(@Nonnull String phoneNumber) {
-        return activeCalls.containsKey(phoneNumber);
+    @Nullable public static String getPendingCallee(@Nonnull String endpoint) {
+        synchronized (MUTEX) {
+            CallSession session = BY_ENDPOINT.get(endpoint);
+            return session != null && session.state() == CallSession.State.RINGING
+                    && session.caller().equals(endpoint) ? session.callee() : null;
+        }
     }
 
-    /** Returns the active call partner's number, or {@code null} if not in an active call. */
-    @Nullable
-    public static String getActivePartner(@Nonnull String phoneNumber) {
-        return activeCalls.get(phoneNumber);
+    @Nullable public static String getPendingCaller(@Nonnull String endpoint) {
+        synchronized (MUTEX) {
+            CallSession session = BY_ENDPOINT.get(endpoint);
+            return session != null && session.state() == CallSession.State.RINGING
+                    && session.callee().equals(endpoint) ? session.caller() : null;
+        }
     }
 
-    /** Returns the callee number if this player is the pending caller (ringing), or {@code null}. */
-    @Nullable
-    public static String getPendingCallee(@Nonnull String phoneNumber) {
-        return pendingCalls.get(phoneNumber);
-    }
-
-    /** Returns the caller number if this player is the pending callee (incoming), or {@code null}. */
-    @Nullable
-    public static String getPendingCaller(@Nonnull String phoneNumber) {
-        return getCallerFor(phoneNumber);
-    }
-
-    // ── Persistence ───────────────────────────────────────────────────────────
-
-    private static void persistRecord(@Nonnull Store<EntityStore> store,
-                                       @Nonnull Ref<EntityStore> ref,
-                                       @Nonnull String ownNumber,
-                                       @Nonnull CallRecord record) {
-        CallHistoryComponent component =
-                store.ensureAndGetComponent(ref, CallHistoryComponent.getComponentType());
-        component.addRecord(ownNumber, record);
+    private static void persistRecord(Store<EntityStore> store, Ref<EntityStore> ref,
+                                      String own, CallRecord record) {
+        CallHistoryComponent component = store.ensureAndGetComponent(
+                ref, CallHistoryComponent.getComponentType());
+        component.addRecord(own, record);
         store.putComponent(ref, CallHistoryComponent.getComponentType(), component);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    @Nullable
-    private static String getCallerFor(@Nonnull String calleeNumber) {
-        for (Map.Entry<String, String> entry : pendingCalls.entrySet()) {
-            if (entry.getValue().equals(calleeNumber)) return entry.getKey();
-        }
-        return null;
-    }
+    private record VoiceRoute(@Nonnull PlayerRef receiver, boolean speakerEnabled) {}
 }

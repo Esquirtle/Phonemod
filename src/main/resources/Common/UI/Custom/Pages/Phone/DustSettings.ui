@@ -1,0 +1,164 @@
+// Settings app (Dust). Device preferences are available to the device owner.
+// Permission-gated framework controls edit validated, persisted server config.
+// The panel scrolls because the sections exceed one screen.
+$D = "../DustLib.ui";
+
+Group {
+  FlexWeight: 1;
+  LayoutMode: Top;
+
+  $D.@DustShellHeader #SettingsHeader { @Title = "Settings"; }
+
+  Group #SettingsTabBar {
+    Anchor: (Height: 36, Bottom: 4);
+    LayoutMode: Left;
+
+    $D.@DustShellTabButton #PlayerSettingsTab { Text: "Player"; FlexWeight: 1; }
+    $D.@DustShellTabButton #PluginSettingsTab { Text: "Plugin"; FlexWeight: 1; Visible: false; }
+  }
+
+  $D.@DustShellPanel #SettingsPanel {
+    FlexWeight: 1;
+    LayoutMode: Top;
+
+    Group #PlayerSettingsView {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+
+      Label {
+        Text: "Player Settings";
+        Anchor: (Bottom: 8);
+        Style: (FontSize: 14, RenderBold: true, TextColor: $D.@DustTextPrimary);
+      }
+
+      Group #DeviceNumberSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label { Text: "Phone Number"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        Label #PhoneNumberLabel { Text: "---"; Style: (FontSize: 18, RenderBold: true, TextColor: $D.@DustTextPrimary); }
+      }
+
+      Group #ThemeSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label #ThemeLabel { Text: "Theme"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellSecondaryButton #ThemeDefault { Anchor: (Height: 32, Bottom: 5); Text: "Default"; }
+        $D.@DustShellSecondaryButton #ThemeDark    { Anchor: (Height: 32, Bottom: 5); Text: "Dark"; }
+        $D.@DustShellSecondaryButton #ThemeCompact { Anchor: (Height: 32); Text: "Compact"; }
+      }
+
+      Group #WallpaperSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label #WallpaperLabel { Text: "Wallpaper"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellSecondaryButton #WallpaperLogo { Anchor: (Height: 32, Bottom: 5); Text: "Logo"; }
+        $D.@DustShellSecondaryButton #WallpaperDark { Anchor: (Height: 32, Bottom: 5); Text: "Dark"; }
+        $D.@DustShellSecondaryButton #WallpaperNone { Anchor: (Height: 32); Text: "None"; }
+      }
+
+      Group #LayoutSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label #LayoutLabel { Text: "App Layout"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellSecondaryButton #LayoutGrid { Anchor: (Height: 32, Bottom: 5); Text: "Grid"; }
+        $D.@DustShellSecondaryButton #LayoutList { Anchor: (Height: 32); Text: "List"; }
+      }
+
+      Group #SoundSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label #SoundLabel { Text: "Sound Profile"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellSecondaryButton #SoundNonkia { Anchor: (Height: 32, Bottom: 5); Text: "Nonkia"; }
+        $D.@DustShellSecondaryButton #SoundSilent { Anchor: (Height: 32); Text: "Silent"; }
+      }
+
+      Group #NotificationsSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label #NotificationsLabel { Text: "Message alerts"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellSecondaryButton #NotificationsEnabled { Anchor: (Height: 32, Bottom: 5); Text: "Show Alerts"; }
+        $D.@DustShellSecondaryButton #NotificationsDisabled { Anchor: (Height: 32); Text: "Disable Alerts"; }
+      }
+
+      Group #MessagePreviewSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label #MessagePreviewLabel { Text: "Message preview"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellSecondaryButton #PreviewEnabled { Anchor: (Height: 32, Bottom: 5); Text: "Show Message Text"; }
+        $D.@DustShellSecondaryButton #PreviewDisabled { Anchor: (Height: 32); Text: "Hide Message Text"; }
+      }
+
+      Group #PlayerCallsSection {
+        LayoutMode: Top;
+        Anchor: (Bottom: $D.@DustShellSpacing);
+        Label #PlayerCallsLabel { Text: "Incoming calls"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellSecondaryButton #PlayerCallsEnabled { Anchor: (Height: 32, Bottom: 5); Text: "Allow Calls"; }
+        $D.@DustShellSecondaryButton #PlayerCallsDisabled { Anchor: (Height: 32); Text: "Do Not Disturb"; }
+      }
+
+      Group #ResetPlayerSection {
+        LayoutMode: Top;
+        Label { Text: "Reset"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+        $D.@DustShellDangerButton #ResetPlayerSettings { Anchor: (Height: 36); Text: "Restore Player Defaults"; }
+      }
+    }
+
+    Group #PluginSettingsView {
+      Visible: false;
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+
+      Label {
+        Text: "Plugin Settings";
+        Anchor: (Bottom: 8);
+        Style: (FontSize: 14, RenderBold: true, TextColor: $D.@DustTextPrimary);
+      }
+      Label {
+        Text: "Server-wide controls. New identities and calls use changes immediately.";
+        Anchor: (Bottom: 10);
+        Style: (FontSize: 10, TextColor: $D.@DustTextSecondary);
+      }
+
+      Label #AddressBindingLabel { Text: "Number binding"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #AddressDevice { Anchor: (Height: 32, Bottom: 5); Text: "Per Device"; }
+      $D.@DustShellSecondaryButton #AddressPlayer { Anchor: (Height: 32, Bottom: 10); Text: "Per Player"; }
+
+      Label #CallsEnabledLabel { Text: "New calls"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #CallsEnabled  { Anchor: (Height: 32, Bottom: 5); Text: "Enable Calls"; }
+      $D.@DustShellSecondaryButton #CallsDisabled { Anchor: (Height: 32, Bottom: 10); Text: "Disable New Calls"; }
+
+      Label #CallAudioLabel { Text: "Call privacy"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #CallAudioAsset   { Anchor: (Height: 32, Bottom: 5); Text: "Use Device Asset"; }
+      $D.@DustShellSecondaryButton #CallAudioPrivate { Anchor: (Height: 32, Bottom: 5); Text: "Private Endpoints"; }
+      $D.@DustShellSecondaryButton #CallAudioSpeaker { Anchor: (Height: 32, Bottom: 5); Text: "Always Speaker"; }
+      $D.@DustShellSecondaryButton #CallAudioToggle  { Anchor: (Height: 32, Bottom: 10); Text: "Player Toggle"; }
+
+      Label #CrossWorldLabel { Text: "Cross-world calls"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #CrossWorldEnabled  { Anchor: (Height: 32, Bottom: 5); Text: "Allow Cross-world"; }
+      $D.@DustShellSecondaryButton #CrossWorldDisabled { Anchor: (Height: 32, Bottom: 10); Text: "Same World Only"; }
+
+      Label #IncomingCallsLabel { Text: "Incoming calls"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #IncomingConnected { Anchor: (Height: 32, Bottom: 5); Text: "Connected Device"; }
+      $D.@DustShellSecondaryButton #IncomingOpenOnly  { Anchor: (Height: 32, Bottom: 10); Text: "Device UI Open"; }
+
+      Label #RingTimeoutLabel { Text: "Ring timeout"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #Ring15 { Anchor: (Height: 32, Bottom: 5); Text: "15 Seconds"; }
+      $D.@DustShellSecondaryButton #Ring30 { Anchor: (Height: 32, Bottom: 5); Text: "30 Seconds"; }
+      $D.@DustShellSecondaryButton #Ring60 { Anchor: (Height: 32, Bottom: 10); Text: "60 Seconds"; }
+
+      Label #SpeakerRadiusLabel { Text: "Speaker radius"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #Speaker4  { Anchor: (Height: 32, Bottom: 5); Text: "4 Blocks"; }
+      $D.@DustShellSecondaryButton #Speaker8  { Anchor: (Height: 32, Bottom: 5); Text: "8 Blocks"; }
+      $D.@DustShellSecondaryButton #Speaker16 { Anchor: (Height: 32, Bottom: 10); Text: "16 Blocks"; }
+
+      Label #OfflineMessagingLabel { Text: "Offline mail"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #OfflineEnabled  { Anchor: (Height: 32, Bottom: 5); Text: "Queue Offline Mail"; }
+      $D.@DustShellSecondaryButton #OfflineDisabled { Anchor: (Height: 32, Bottom: 10); Text: "Online Delivery Only"; }
+
+      Label #MessageLengthLabel { Text: "Message limit"; Anchor: (Bottom: 6); Style: (FontSize: 12, TextColor: $D.@DustTextSecondary); }
+      $D.@DustShellSecondaryButton #Message128  { Anchor: (Height: 32, Bottom: 5); Text: "128 Characters"; }
+      $D.@DustShellSecondaryButton #Message512  { Anchor: (Height: 32, Bottom: 5); Text: "512 Characters"; }
+      $D.@DustShellSecondaryButton #Message1024 { Anchor: (Height: 32); Text: "1024 Characters"; }
+    }
+  }
+}

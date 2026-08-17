@@ -36,6 +36,18 @@ public final class DeviceSettings {
                     (settings, value) -> settings.soundProfileId = value,
                     settings -> settings.soundProfileId)
             .add()
+            .append(new KeyedCodec<>("NotificationsEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.notificationsEnabled = value,
+                    settings -> settings.notificationsEnabled)
+            .add()
+            .append(new KeyedCodec<>("MessagePreviewEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.messagePreviewEnabled = value,
+                    settings -> settings.messagePreviewEnabled)
+            .add()
+            .append(new KeyedCodec<>("IncomingCallsEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.incomingCallsEnabled = value,
+                    settings -> settings.incomingCallsEnabled)
+            .add()
             .append(new KeyedCodec<>("ShellPreset", Codec.STRING),
                     (settings, value) -> settings.shellPreset = value,
                     settings -> settings.shellPreset)
@@ -51,6 +63,9 @@ public final class DeviceSettings {
     private String iconPack;
     private String appLayout;
     private String soundProfileId;
+    private boolean notificationsEnabled = true;
+    private boolean messagePreviewEnabled = true;
+    private boolean incomingCallsEnabled = true;
     private String shellPreset;
     private String[] statusModules = EMPTY_STRINGS;
 
@@ -63,6 +78,9 @@ public final class DeviceSettings {
         this.iconPack = source.iconPack;
         this.appLayout = source.appLayout;
         this.soundProfileId = source.soundProfileId;
+        this.notificationsEnabled = source.notificationsEnabled;
+        this.messagePreviewEnabled = source.messagePreviewEnabled;
+        this.incomingCallsEnabled = source.incomingCallsEnabled;
         this.shellPreset = source.shellPreset;
         this.statusModules = source.statusModules != null ? source.statusModules.clone() : EMPTY_STRINGS;
     }
@@ -112,6 +130,30 @@ public final class DeviceSettings {
         this.soundProfileId = soundProfileId;
     }
 
+    public boolean isNotificationsEnabled() {
+        return notificationsEnabled;
+    }
+
+    public void setNotificationsEnabled(boolean notificationsEnabled) {
+        this.notificationsEnabled = notificationsEnabled;
+    }
+
+    public boolean isMessagePreviewEnabled() {
+        return messagePreviewEnabled;
+    }
+
+    public void setMessagePreviewEnabled(boolean messagePreviewEnabled) {
+        this.messagePreviewEnabled = messagePreviewEnabled;
+    }
+
+    public boolean isIncomingCallsEnabled() {
+        return incomingCallsEnabled;
+    }
+
+    public void setIncomingCallsEnabled(boolean incomingCallsEnabled) {
+        this.incomingCallsEnabled = incomingCallsEnabled;
+    }
+
     @Nullable
     public String getShellPreset() {
         return shellPreset;
@@ -130,4 +172,3 @@ public final class DeviceSettings {
         this.statusModules = statusModules != null ? statusModules.clone() : EMPTY_STRINGS;
     }
 }
-

@@ -7,9 +7,11 @@ import esq.phonemod.device.routing.handlers.OpenAppHandler;
 import esq.phonemod.device.routing.handlers.OpenChatHandler;
 import esq.phonemod.device.routing.guards.AppCapabilityGuard;
 import esq.phonemod.device.routing.guards.CurrentAppIsNotGuard;
+import esq.phonemod.device.routing.guards.CallStateGuard;
 import esq.phonemod.device.routing.guards.ValidationGuard;
 import esq.phonemod.device.routing.resolvers.AppResolver;
 import esq.phonemod.phone.api.PhoneEventActions;
+import esq.phonemod.device.core.DevicePageState;
 
 import javax.annotation.Nonnull;
 import java.util.HashMap;
@@ -27,6 +29,7 @@ import java.util.Map;
 public final class DefaultPhoneRouter implements PhoneRouter {
 
     private final Map<String, Route> routes = new HashMap<>();
+    private volatile boolean frozen;
     private final Route fallbackRoute;
 
     public DefaultPhoneRouter(@Nonnull Route fallbackRoute) {
@@ -71,37 +74,64 @@ public final class DefaultPhoneRouter implements PhoneRouter {
         CallActionsHandler callActions = new CallActionsHandler();
         router.registerRoute(Route.builder(PhoneEventActions.ANSWER_CALL)
                 .guard(new AppCapabilityGuard("calls"))
+                .guard(new CallStateGuard(DevicePageState.INCOMING_CALL))
                 .handler(callActions)
                 .metadata(RouteMetadata.of("answer-call", "Answer an incoming call"))
                 .build());
         router.registerRoute(Route.builder(PhoneEventActions.DECLINE_CALL)
                 .guard(new AppCapabilityGuard("calls"))
+                .guard(new CallStateGuard(DevicePageState.INCOMING_CALL))
                 .handler(callActions)
                 .metadata(RouteMetadata.of("decline-call", "Decline a ringing call"))
                 .build());
         router.registerRoute(Route.builder(PhoneEventActions.HANG_UP)
                 .guard(new AppCapabilityGuard("calls"))
+                .guard(new CallStateGuard(DevicePageState.ACTIVE_CALL))
                 .handler(callActions)
                 .metadata(RouteMetadata.of("hang-up", "End an active call"))
                 .build());
+        router.registerRoute(Route.builder(PhoneEventActions.SPEAKER_ON)
+                .guard(new AppCapabilityGuard("calls"))
+                .guard(new CallStateGuard(DevicePageState.ACTIVE_CALL))
+                .handler(callActions)
+                .metadata(RouteMetadata.of("speaker-on", "Enable speaker audio for a toggleable call"))
+                .build());
+        router.registerRoute(Route.builder(PhoneEventActions.SPEAKER_OFF)
+                .guard(new AppCapabilityGuard("calls"))
+                .guard(new CallStateGuard(DevicePageState.ACTIVE_CALL))
+                .handler(callActions)
+                .metadata(RouteMetadata.of("speaker-off", "Return a toggleable call to private audio"))
+                .build());
 
+        router.frozen = true;
         return router;
     }
 
     @Override
     public void registerRoute(@Nonnull Route route) {
+        if (frozen) {
+            throw new IllegalStateException("Router is frozen");
+        }
         routes.put(route.getAction(), route);
     }
 
     @Override
     public void route(@Nonnull RouteContext context) {
         Route route = routes.get(context.getAction());
-        if (route != null && guardsPass(route, context)) {
-            apply(context, execute(route, context));
+        if (route != null) {
+            if (guardsPass(route, context)) {
+                apply(context, execute(route, context));
+            } else {
+                apply(context, RouteResult.empty());
+            }
             return;
         }
-        // No matching route, or a guard rejected it: fall through to the app handler.
-        apply(context, execute(fallbackRoute, context));
+        if (context.getSession().getCurrentState() == DevicePageState.APP
+                && context.getSession().getCurrentApp() != null) {
+            apply(context, execute(fallbackRoute, context));
+        } else {
+            apply(context, RouteResult.empty());
+        }
     }
 
     private static boolean guardsPass(@Nonnull Route route, @Nonnull RouteContext context) {

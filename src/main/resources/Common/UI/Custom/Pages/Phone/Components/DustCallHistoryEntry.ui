@@ -1,0 +1,27 @@
+// One call-history row, appended into #CallHistoryList.
+// Contract: app sets #ContactName.Text / #CallStatus.Text and binds
+// #CallBackButton.
+$D = "../../DustLib.ui";
+
+$D.@DustShellListEntry #CallHistoryEntry {
+  Anchor: (Height: $D.@DustShellListEntryHeight, Bottom: 6);
+
+  Group #CallInfo {
+    FlexWeight: 1;
+    LayoutMode: Top;
+
+    Label #ContactName {
+      Text: "Name (555-0000)";
+      Style: (FontSize: 13, TextColor: $D.@DustTextPrimary);
+    }
+    Label #CallStatus {
+      Text: "Outgoing";
+      Style: (FontSize: 11, TextColor: $D.@DustTextSecondary);
+    }
+  }
+
+  $D.@DustShellActionButton #CallBackButton {
+    Anchor: (Width: 54, Height: 38);
+    Text: "Call";
+  }
+}

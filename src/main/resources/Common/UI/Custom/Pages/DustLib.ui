@@ -1,0 +1,441 @@
+$C = "Common.ui";
+
+// DustLib: shared device UI components and reusable page building blocks.
+//
+// This is the single source of truth for the Dust look: it declares both the
+// design tokens (@Dust* values below) AND the component templates that consume
+// them. It is fully self-contained — import it directly and reference its
+// members with the $ prefix, e.g. `$D.@DustShellHeader` and `$D.@DustTextPrimary`.
+//
+// The token values here are the DEFAULT (light) palette. Alternate themes
+// (Dark, Compact, ...) are NOT separate .ui files — Hytale named expressions are
+// file-scoped and cannot be overridden across documents. Instead, themes are
+// data: palettes live in Server/Phonemod/Themes/<Theme>.json and are applied at
+// runtime by ThemeService, which sets background colors on the themeable
+// selectors declared in each device asset's "Selectors" map.
+
+@DustShellPadding = 14;
+@DustShellSpacing = 10;
+@DustShellBackground = #151c26;
+@DustPanelBackground = #1f2936;
+@DustPanelAltBackground = #192032;
+@DustShellHeaderBackground = #202c3a;
+@DustShellTopbarBackground = #1d2634;
+@DustSectionHeaderBackground = #182032;
+@DustShellDividerBackground = #233046;
+@DustShellHeaderHeight = 44;
+@DustShellTopbarHeight = 36;
+@DustShellButtonRowHeight = 44;
+@DustShellSectionHeaderHeight = 28;
+@DustStatusBarHeight = 30;
+@DustHomeBarHeight = 42;
+@DustPanelPadding = 12;
+@DustShellGridPadding = 8;
+@DustShellAppButtonWidth = 84;
+@DustShellAppButtonHeight = 100;
+@DustAppIconSize = 64;
+@DustShellListEntryHeight = 58;
+@DustShellInputRowHeight = 54;
+@DustTextFieldHeight = 38;
+@DustShellMessageInputHeight = 54;
+@DustShellSendButtonWidth = 50;
+@DustShellInputBackground = #162031;
+@DustShellMessageInputBackground = #1a2534;
+@DustAppButtonBackground = #2f3f57;
+@DustAppButtonHover = #405a79;
+@DustAppButtonPressed = #26334b;
+@DustShellListEntryBackground = #1f2a38;
+@DustShellActionButtonHeight = 44;
+@DustShellActionButtonBackground = #2f3f57;
+@DustShellActionButtonHover = #405a79;
+@DustShellActionButtonPressed = #26334b;
+@DustShellSecondaryButtonBackground = #2a3450;
+@DustShellSecondaryButtonHover = #334165;
+@DustShellSecondaryButtonPressed = #1f2738;
+@DustShellDangerButtonBackground = #d94f4f;
+@DustShellDangerButtonHover = #c13f3f;
+@DustShellDangerButtonPressed = #922f2f;
+@DustShellSendButtonBackground = #4ba96f;
+@DustShellSendButtonHover = #62bd86;
+@DustShellSendButtonPressed = #3c7b56;
+@DustShellBadgeBackground = @DustShellDangerButtonBackground;
+@DustTextPrimary = #e3eef7;
+@DustTextSecondary = #96a9be;
+@DustDanger = #d94f4f;
+
+// Shared button label styles. Apply one in EVERY button state (Default/Hovered/
+// Pressed) — a state with no LabelStyle reverts the label to an unstyled default
+// (wrong size/colour/alignment), which looks broken on hover/press.
+@DustButtonLabel       = LabelStyle(FontSize: 14, Alignment: Center, TextColor: @DustTextPrimary);
+@DustButtonLabelActive = LabelStyle(FontSize: 14, RenderBold: true, Alignment: Center, TextColor: @DustTextPrimary);
+@DustSendLabel         = LabelStyle(FontSize: 12, Alignment: Center, TextColor: @DustTextPrimary);
+@DustSendLabelActive   = LabelStyle(FontSize: 12, RenderBold: true, Alignment: Center, TextColor: @DustTextPrimary);
+
+@DustShellPage = Group {
+  LayoutMode: Top;
+  Padding: (Full: @DustShellPadding);
+  Background: @DustShellBackground;
+};
+
+// Customize per instance by overriding the named expressions, e.g.
+//   $D.@DustShellHeader #MyHeader { @Title = "Whatgram"; }
+// (Named-expression override is the supported template-customization path —
+// see Common.ui @TextButton's @Text. Do not override nested child properties.)
+@DustShellHeader = Group {
+  @Title = "Title";
+  @Subtitle = "";
+  @ShowSubtitle = false;
+  LayoutMode: Top;
+  Anchor: (Height: @DustShellHeaderHeight);
+  Background: @DustShellHeaderBackground;
+  Padding: (Horizontal: @DustShellPadding);
+  Label #DustHeaderTitle {
+    Text: @Title;
+    Style: (FontSize: 15, RenderBold: true, Alignment: Center, TextColor: @DustTextPrimary);
+  }
+  Label #DustHeaderSubtitle {
+    Visible: @ShowSubtitle;
+    Anchor: (Height: 18);
+    Text: @Subtitle;
+    Style: (FontSize: 11, TextColor: @DustTextSecondary);
+  }
+};
+
+// App bar: a header with a leading back button, a centered title, and a trailing
+// action button. Back/action start hidden — an app reveals them per view and
+// retitles #HeaderTitle. Owns #BackButton / #HeaderTitle / #ActionButton; the
+// action label is set once via @ActionText.
+@DustAppBar = Group {
+  @Title = "Title";
+  @ActionText = "Action";
+  LayoutMode: Top;
+  Anchor: (Height: @DustShellHeaderHeight);
+  Background: @DustShellHeaderBackground;
+  Padding: (Horizontal: @DustShellPadding);
+  Label #HeaderTitle {
+    FlexWeight: 2;
+    Text: @Title;
+    Style: (FontSize: 15, RenderBold: true, TextColor: @DustTextPrimary, Alignment: Center);
+  }
+  @DustShellActionButton #BackButton {
+    FlexWeight: 1;
+    Visible: false;
+    Anchor: (Width: 52, Height: 30, Right: 8);
+    Text: "Back";
+
+  }
+
+  @DustShellActionButton #ActionButton {
+    FlexWeight: 1;
+    Visible: false;
+    Anchor: (Width: 52, Height: 30);
+    Text: @ActionText;
+  }
+};
+
+@DustShellTopbar = Group {
+  LayoutMode: Left;
+  Anchor: (Height: @DustShellTopbarHeight);
+  Background: @DustShellTopbarBackground;
+  Padding: (Horizontal: @DustShellPadding);
+};
+
+@DustShellButtonRow = Group {
+  LayoutMode: Left;
+  Anchor: (Height: @DustShellButtonRowHeight);
+};
+
+@DustShellPanel = Group {
+  LayoutMode: Top;
+  Background: @DustPanelBackground;
+  Padding: (Full: @DustPanelPadding);
+};
+
+@DustShellCard = Group {
+  LayoutMode: Top;
+  Background: @DustPanelAltBackground;
+  Padding: (Full: @DustPanelPadding);
+};
+
+@DustShellSectionHeader = Group {
+  LayoutMode: Left;
+  Anchor: (Height: @DustShellSectionHeaderHeight);
+  Background: @DustSectionHeaderBackground;
+  Padding: (Horizontal: @DustShellPadding);
+  Label #DustSectionTitle {
+    Text: "Section";
+    Style: (FontSize: 11, RenderBold: true, RenderUppercase: true, TextColor: @DustTextSecondary);
+  }
+};
+
+@DustShellDivider = Group {
+  Anchor: (Height: 1);
+  Background: @DustShellDividerBackground;
+};
+
+@DustShellAppGrid = Group {
+  LayoutMode: LeftCenterWrap;
+  Padding: (Horizontal: @DustShellGridPadding, Vertical: @DustShellGridPadding);
+};
+
+@DustShellAppButton = Group {
+  LayoutMode: Top;
+  FlexWeight: 1;
+  Padding: (Horizontal: 6, Vertical: 3);
+  Anchor: (Width: @DustShellAppButtonWidth, Height: @DustShellAppButtonHeight);
+  Group #DustAppDebug {
+    Visible: false;
+    Anchor: (Width: 15, Height: 15);
+  }
+  TextButton #DustAppButton {
+    Padding: (Full: 5);
+    Anchor: (Width: @DustAppIconSize, Height: @DustAppIconSize);
+    Style: (
+      Default: (Background: @DustAppButtonBackground),
+      Hovered: (Background: @DustAppButtonBackground),
+      Pressed: (Background: @DustAppButtonPressed)
+    );
+  }
+  Label #DustAppName {
+    Anchor: (Top: 8, Width: @DustAppIconSize, Height: 16);
+    Text: "App";
+    Style: (FontSize: 12, Alignment: Center, RenderBold: true, TextColor: @DustTextPrimary);
+  }
+};
+
+// App-grid button matching the framework contract: a #APPBUTTONENTRY root
+// holding a #APPBUTTON (bound + icon) and a #APPNAME label (text set at runtime).
+// Per-app files differ ONLY by the icon, passed via @Icon.
+// IMPORTANT: @Icon is consumed HERE, so its relative texture path resolves from
+// THIS file's folder (Pages/), not from the per-app caller. Callers therefore
+// pass e.g. "Phone/Whatgram.png" (relative to Pages/), not "../Whatgram.png".
+@PhoneAppButton = Group {
+  @Icon = "Phone/Whatgram.png";
+  LayoutMode: Top;
+  FlexWeight: 1;
+  Padding: (Horizontal: 3, Vertical: 3);
+  Anchor: (Width: @DustShellAppButtonWidth, Height: @DustShellAppButtonHeight);
+  TextButton #APPBUTTON {
+    Anchor: (Width: @DustAppIconSize, Height: @DustAppIconSize);
+    Style: (
+      Default: (Background: @Icon),
+      Hovered: (Background: @Icon),
+      Pressed: (Background: @DustAppButtonPressed)
+    );
+  }
+  Label #APPNAME {
+    Anchor: (Top: 8, Width: @DustShellAppButtonWidth, Height: 16);
+    Text: "App";
+    Style: (FontSize: 12, Alignment: Center, RenderBold: true, TextColor: @DustTextPrimary);
+  }
+};
+
+@DustShellListEntry = Group {
+  LayoutMode: Left;
+  Anchor: (Height: @DustShellListEntryHeight);
+  Padding: (Horizontal: 10, Vertical: 8);
+  Background: @DustShellListEntryBackground;
+};
+
+// Scrolling content list. Apps append rows into instances of this. Add a new id
+// (and any padding) at the instance site, e.g.
+//   $D.@DustScrollList #ContactsList { Padding: (Full: $D.@DustPanelPadding); }
+@DustScrollList = Group {
+  FlexWeight: 1;
+  LayoutMode: TopScrolling;
+  Background: @DustShellListEntryBackground;
+};
+
+// Full-screen centered surface for device-driven takeover screens (call
+// overlays, prompts). Add the centered content column as a child.
+@DustCenterScreen = Group {
+  FlexWeight: 1;
+  LayoutMode: CenterMiddle;
+  Background: @DustShellBackground;
+};
+
+// ── Device shell chrome ─────────────────────────────────────────────────────
+// Reusable shell building blocks. Each owns a framework selector that the device
+// asset's JSON must declare and the runtime (DeviceShell -> DevicePage) drives.
+// Compose these inside a concrete device frame (e.g. Phone.ui keeps the bezel
+// image + geometry and instantiates these for its chrome).
+//
+//   Shell selector contract
+//   ───────────────────────
+//   #TopBar      status bar surface   device JSON: Selectors.topbar
+//   #BottomBar   home bar surface     device JSON: Selectors.bottombar
+//   #HomeButton  home key             device JSON: HomeButtonSelector
+//   (more as further chrome lands: #AppContent, #APPHolder)
+
+// Status bar. Owns #TopBar (themed: topbar). Carrier label baked; logo/battery
+// images come from the concrete shell. @Logo/@Battery resolve from THIS file's
+// folder (Pages/) — pass e.g. "Phone/hytel_logo.png", not "../Phone/...".
+@DustStatusBar = Group {
+  @Carrier = "HyTel";
+  @Logo    = "Phone/hytel_logo.png";
+  @Battery = "Phone/battery_icon.png";
+  LayoutMode: Left;
+  Anchor: (Height: @DustStatusBarHeight);
+  Background: @DustShellTopbarBackground;
+  Padding: (Horizontal: 12, Vertical: 6);
+  Label {
+    FlexWeight: 1;
+    Text: @Carrier;
+    Style: (FontSize: 11, RenderBold: true, TextColor: @DustTextSecondary, VerticalAlignment: Center);
+  }
+  Group #HytelLogo {
+    Background: @Logo;
+    Anchor: (Width: 16, Height: 16, Right: 8);
+  }
+  Group #BatteryIcon {
+    Background: @Battery;
+    Anchor: (Width: 22, Height: 14);
+  }
+};
+
+// Persistent home bar. Owns #BottomBar (themed: bottombar) and #HomeButton.
+// Solid dark surface (its own tonal layer beneath the lighter screen content).
+@HomeButton = TextButton {
+  @Text = "O";
+  Anchor: (Width: 32, Height: 32);
+  Style: (
+    Default: (Background: @DustShellActionButtonBackground, LabelStyle: (FontSize: 14, Alignment: Center, TextColor: @DustTextPrimary)),
+    Hovered: (Background: @DustShellActionButtonHover, LabelStyle: (FontSize: 15, RenderBold: true, Alignment: Center, TextColor: @DustTextPrimary)),
+    Pressed: (Background: @DustShellActionButtonPressed, LabelStyle: (FontSize: 15, RenderBold: true, Alignment: Center, TextColor: @DustTextPrimary))
+  );
+};
+@DustHomeBar = Group {
+  LayoutMode: CenterMiddle;
+  Anchor: (Height: @DustHomeBarHeight);
+  @HomeButton #HomeButton{
+    Anchor: (Width: 32, Height: 32);
+  }
+};
+
+@DustShellListEntryText = Label {
+  Style: (FontSize: 14, TextColor: @DustTextPrimary);
+};
+
+@DustShellListEntrySubtext = Label {
+  Style: (FontSize: 11, TextColor: @DustTextSecondary);
+};
+
+@DustShellActions = Group {
+  LayoutMode: Left;
+};
+
+
+@DustShellDefaultButtonStyle = (
+  Default: (Background: @DustShellActionButtonBackground, LabelStyle: @DustButtonLabel),
+  Hovered: (Background: @DustShellActionButtonHover, LabelStyle: @DustButtonLabelActive),
+  Pressed: (Background: @DustShellActionButtonPressed, LabelStyle: @DustButtonLabelActive)
+);
+@DustShellSecondaryButtonStyle = (
+  Default: (Background: @DustShellSecondaryButtonBackground, LabelStyle: @DustButtonLabel),
+  Hovered: (Background: @DustShellSecondaryButtonHover, LabelStyle: @DustButtonLabelActive),
+  Pressed: (Background: @DustShellSecondaryButtonPressed, LabelStyle: @DustButtonLabelActive)
+);
+@DustShellActionButton = TextButton {
+  Anchor: (Height: @DustShellActionButtonHeight);
+  Style: (
+    Default: (Background: @DustShellActionButtonBackground, LabelStyle: @DustButtonLabel),
+    Hovered: (Background: @DustShellActionButtonHover, LabelStyle: @DustButtonLabelActive),
+    Pressed: (Background: @DustShellActionButtonPressed, LabelStyle: @DustButtonLabelActive)
+  );
+};
+
+@DustShellSecondaryButton = TextButton {
+  Anchor: (Height: @DustShellActionButtonHeight);
+  Style: @DustShellSecondaryButtonStyle;
+};
+
+@DustShellDangerButton = TextButton {
+  Anchor: (Height: @DustShellActionButtonHeight);
+  Style: (
+    Default: (Background: @DustShellDangerButtonBackground, LabelStyle: @DustButtonLabel),
+    Hovered: (Background: @DustShellDangerButtonHover, LabelStyle: @DustButtonLabelActive),
+    Pressed: (Background: @DustShellDangerButtonPressed, LabelStyle: @DustButtonLabelActive)
+  );
+};
+
+@DustShellInputRow = Group {
+  LayoutMode: Left;
+  Anchor: (Height: @DustShellInputRowHeight);
+  Background: @DustShellInputBackground;
+  Padding: (Horizontal: 10, Vertical: 8);
+  $C.@TextField #DustTextField {
+    FlexWeight: 1;
+    Anchor: (Height: @DustTextFieldHeight);
+    PlaceholderText: "Enter text...";
+  }
+};
+@DustShellInputFieldStyle = InputFieldStyle();
+@DustShellInputDefaultFieldStyle = InputFieldStyle(TextColor: #6e7da1);
+@DustShellInputField = TextField {
+  @Anchor = ();
+
+  Style: @DustShellInputFieldStyle;
+  PlaceholderStyle: @DustShellInputDefaultFieldStyle;
+  Background: @DustShellInputBackground;
+  Anchor: (...@Anchor, Height: 38);
+  Padding: (Horizontal: 10);
+};
+@DustShellFormRow = Group {
+  LayoutMode: Top;
+  Padding: (Vertical: 6);
+  Label #DustFormLabel {
+    Text: "Field";
+    Style: (FontSize: 12, RenderBold: true, TextColor: @DustTextSecondary);
+  }
+};
+
+@DustShellMessageInput = Group {
+  LayoutMode: Left;
+  Anchor: (Height: @DustShellMessageInputHeight);
+  Background: @DustShellMessageInputBackground;
+  Padding: (Full: 8);
+  @DustShellInputField #DustMessageInput {
+    FlexWeight: 1;
+    Anchor: (Height: @DustTextFieldHeight);
+    PlaceholderText: "Message...";
+  }
+  TextButton #DustSendButton {
+    Anchor: (Width: @DustShellSendButtonWidth, Height: @DustTextFieldHeight);
+    Style: (
+      Default: (Background: @DustShellSendButtonBackground, LabelStyle: @DustSendLabel),
+      Hovered: (Background: @DustShellSendButtonHover, LabelStyle: @DustSendLabelActive),
+      Pressed: (Background: @DustShellSendButtonPressed, LabelStyle: @DustSendLabelActive)
+    );
+  }
+};
+
+// Tab button — used in the App Store tab bar.
+// AppStoreApp highlights the current tab by swapping the button's `.Style`
+// between the two named styles below via Value.ref (`.Active` is NOT a real
+// markup property and cannot be set at runtime).
+@DustShellTabActive   = #2f3f57;
+@DustShellTabInactive = #1a2534;
+@DustShellTabStyleInactive = (
+  Default: (Background: @DustShellTabInactive, LabelStyle: (FontSize: 12, Alignment: Center, TextColor: @DustTextSecondary)),
+  Hovered: (Background: @DustShellTabActive,   LabelStyle: (FontSize: 12, Alignment: Center, TextColor: @DustTextPrimary)),
+  Pressed: (Background: @DustShellTabActive,   LabelStyle: (FontSize: 12, Alignment: Center, TextColor: @DustTextPrimary))
+);
+@DustShellTabStyleActive = (
+  Default: (Background: @DustShellTabActive, LabelStyle: (FontSize: 12, Alignment: Center, RenderBold: true, TextColor: @DustTextPrimary)),
+  Hovered: (Background: @DustShellTabActive, LabelStyle: (FontSize: 12, Alignment: Center, RenderBold: true, TextColor: @DustTextPrimary)),
+  Pressed: (Background: @DustShellTabActive, LabelStyle: (FontSize: 12, Alignment: Center, RenderBold: true, TextColor: @DustTextPrimary))
+);
+@DustShellTabButton = TextButton {
+  Anchor: (Height: 32);
+  Style: @DustShellTabStyleInactive;
+};
+
+@DustShellNotificationBadge = Group {
+  Anchor: (Width: 24, Height: 24);
+  Background: @DustShellBadgeBackground;
+  Label #DustBadgeValue {
+    Anchor: (Width: 24, Height: 24);
+    Text: "1";
+    Style: (Alignment: Center, FontSize: 12, TextColor: #ffffff, RenderBold: true);
+  }
+};

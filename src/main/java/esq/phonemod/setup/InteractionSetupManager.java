@@ -21,7 +21,8 @@ public class InteractionSetupManager {
             plugin.getCodecRegistry(Interaction.CODEC)
                     .register("open_phone", OpenPhone.class, OpenPhone.CODEC);
         } catch (Exception e) {
-            LOGGER.atSevere().log("Failed to register interactions!");
+            LOGGER.atSevere().withCause(e).log("Failed to register interactions!");
+            throw new IllegalStateException("Required phone interaction registration failed", e);
         }
 
     }

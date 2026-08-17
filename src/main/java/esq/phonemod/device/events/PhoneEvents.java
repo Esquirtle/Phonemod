@@ -29,6 +29,7 @@ import java.util.function.Consumer;
  * from. Listeners that mutate game state must dispatch back to the correct
  * world thread themselves.
  */
+@Deprecated(since = "2.0", forRemoval = false)
 public final class PhoneEvents {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();

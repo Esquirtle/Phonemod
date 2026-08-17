@@ -1,0 +1,29 @@
+// Incoming-call overlay. Replaces the shell content area (driven by DevicePage).
+// Contract: app sets #CallerName.Text and binds #AnswerButton / #DeclineButton.
+$D = "../../DustLib.ui";
+
+$D.@DustCenterScreen {
+  Group {
+    LayoutMode: Top;
+    Padding: (Full: 24);
+
+    Label {
+      Text: "Incoming Call";
+      Anchor: (Bottom: 8);
+      Style: (FontSize: 14, Alignment: Center, TextColor: $D.@DustTextSecondary);
+    }
+    Label #CallerName {
+      Text: "Unknown";
+      Anchor: (Bottom: 32);
+      Style: (FontSize: 20, Alignment: Center, RenderBold: true, TextColor: $D.@DustTextPrimary);
+    }
+
+    Group #IncomingButtons {
+      LayoutMode: Left;
+      Anchor: (Height: $D.@DustShellActionButtonHeight);
+
+      $D.@DustShellActionButton #AnswerButton { FlexWeight: 1; Anchor: (Right: 8); Text: "Answer"; }
+      $D.@DustShellDangerButton #DeclineButton { FlexWeight: 1; Text: "Decline"; }
+    }
+  }
+}

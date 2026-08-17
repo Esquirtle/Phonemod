@@ -2,129 +2,27 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <parent>
         <groupId>esq</groupId>
         <artifactId>esq-parent</artifactId>
         <version>1.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-
     <groupId>esq.phonemod</groupId>
-    <artifactId>Phonemod</artifactId>
-    <version>1.0.0</version>
+    <artifactId>phonemod-parent</artifactId>
+    <version>2.0.0-alpha.1</version>
+    <packaging>pom</packaging>
+    <name>Phonemod</name>
+
+    <modules>
+        <module>phonemod-api</module>
+        <module>phonemod-runtime</module>
+    </modules>
 
     <properties>
-        <hytale.install-dir>/home/ed/hytale/WORKSPACE/dev/HytaleServer.jar</hytale.install-dir>
+        <hytale.install-dir>${project.basedir}/../HytaleServer.jar</hytale.install-dir>
         <hytale.patchline>pre-release</hytale.patchline>
-        <phonemod.assets.dir>C:\Users\ed\IdeaProjects\Phonemod-Assets</phonemod.assets.dir>
+        <junit.version>5.12.2</junit.version>
+        <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
     </properties>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.1</version>
-                <executions>
-                    <execution>
-                        <id>shade</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <shadedArtifactAttached>true</shadedArtifactAttached>
-                    <finalName>${project.name}</finalName>
-                    <outputDirectory>${project.basedir}/target/final</outputDirectory>
-                    <createSourcesJar>false</createSourcesJar>
-                    <!--
-                        Shade the permission-framework module into this JAR.
-                        The Hytale runtime loads only plugin JARs (identified by
-                        manifest.json + Main class). There is no separate classpath
-                        for library JARs — the framework must ship inside PhoneMod.
-                    -->
-                    <artifactSet>
-                        <includes>
-                            <include>esq:permission-framework</include>
-                        </includes>
-                    </artifactSet>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
-
-    <dependencies>
-        <!-- Hytale server (compile-time, provided at runtime by the game) -->
-        <dependency>
-            <groupId>com.hytale</groupId>
-            <artifactId>hytale-server</artifactId>
-            <version>LOCAL</version>
-            <scope>system</scope>
-            <systemPath>${hytale.install-dir}</systemPath>
-        </dependency>
-
-        <!--
-            Permission framework — separate source module, shaded into this JAR.
-            Must be compile scope (NOT system): maven-shade-plugin excludes
-            system/provided dependencies, so a system-scoped framework would be
-            left out of the shaded JAR and fail at runtime with NoClassDefFoundError.
-            Resolved from the reactor (parent build) or the local repo.
-        -->
-        <dependency>
-            <groupId>esq</groupId>
-            <artifactId>permission-framework</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-    </dependencies>
-
-    <profiles>
-        <profile>
-            <id>bundle</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>3.4.0</version>
-                        <executions>
-                            <execution>
-                                <id>add-phone-asset-resources</id>
-                                <phase>generate-resources</phase>
-                                <goals>
-                                    <goal>add-resource</goal>
-                                </goals>
-                                <configuration>
-                                    <resources>
-                                        <resource>
-                                            <directory>${phonemod.assets.dir}/Common</directory>
-                                            <targetPath>.</targetPath>
-                                            <filtering>false</filtering>
-                                        </resource>
-                                        <resource>
-                                            <directory>${phonemod.assets.dir}/Server</directory>
-                                            <targetPath>.</targetPath>
-                                            <filtering>false</filtering>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>

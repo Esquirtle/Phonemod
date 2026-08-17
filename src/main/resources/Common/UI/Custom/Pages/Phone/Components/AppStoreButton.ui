@@ -1,0 +1,21 @@
+// App Store home-grid button — a Dust-coloured tile (no image resource). Matches
+// the #APPBUTTONENTRY / #APPBUTTON / #APPNAME contract; DevicePage sets the label.
+$D = "../../DustLib.ui";
+
+Group #APPBUTTONENTRY {
+  LayoutMode: Top;
+  FlexWeight: 1;
+  Padding: (Horizontal: 3, Vertical: 3);
+  Anchor: (Width: $D.@DustShellAppButtonWidth, Height: $D.@DustShellAppButtonHeight);
+  TextButton #APPBUTTON {
+    Anchor: (Width: $D.@DustAppIconSize, Height: $D.@DustAppIconSize);
+    Style: (
+      Default: (Background: "Appstore.png")
+    );
+  }
+  Label #APPNAME {
+    Anchor: (Top: 8, Width: $D.@DustShellAppButtonWidth, Height: 16);
+    Text: "Store";
+    Style: (FontSize: 12, Alignment: Center, RenderBold: true, TextColor: $D.@DustTextPrimary);
+  }
+}

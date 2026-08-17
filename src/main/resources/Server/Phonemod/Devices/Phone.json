@@ -11,6 +11,7 @@
   "DefaultThemeId": "Default",
   "DefaultWallpaper": "Pages/Phone/hytel_logo.png",
   "DefaultIconPack": "Default",
+  "CallAudioPolicy": "Private",
   "SoundProfile": {
     "MessageReceived": "Notification_Message_Received",
     "MessageSent": "Notification_Message_Sent",

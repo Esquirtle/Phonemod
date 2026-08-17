@@ -1,0 +1,31 @@
+// Group Chat root — a single shared conversation, composed from DustLib.
+//
+// Reference UI for the realtime sync layer: #GroupChatContent is re-filled from
+// the shared channel state on every change (the Java app subscribes in build and
+// the framework re-renders all viewers on publish); #GroupChatComposer sends new
+// messages. Themed selectors: #GroupChatHeader / #GroupChatPanel / #GroupChatContent.
+//
+//   #GroupChatHeader   @DustAppBar — "Group Chat"
+//   #GroupChatPanel    themed panel surface (role: appPanel)
+//     #GroupChatContent  scrolling message bubbles (role: appContent)
+//     #GroupChatComposer @DustShellMessageInput (#DustMessageInput / #DustSendButton)
+$D = "../DustLib.ui";
+
+Group {
+  FlexWeight: 1;
+  LayoutMode: Top;
+
+  $D.@DustAppBar #GroupChatHeader { @Title = "Group Chat"; }
+
+  $D.@DustShellPanel #GroupChatPanel {
+    FlexWeight: 1;
+
+    // Scrolling list of message bubbles (role: appContent).
+    $D.@DustScrollList #GroupChatContent { }
+
+    // Always-visible composer (#DustMessageInput / #DustSendButton).
+    $D.@DustShellMessageInput #GroupChatComposer {
+      Anchor: (Height: $D.@DustShellMessageInputHeight, Top: $D.@DustShellSpacing);
+    }
+  }
+}

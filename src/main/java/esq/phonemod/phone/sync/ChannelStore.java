@@ -3,6 +3,7 @@ package esq.phonemod.phone.sync;
 import com.hypixel.hytale.codec.util.RawJsonReader;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.util.BsonUtil;
+import com.hypixel.hytale.server.core.universe.Universe;
 import org.bson.BsonDocument;
 
 import javax.annotation.Nonnull;
@@ -13,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * JSON persistence for sync channels, under {@code <dataDir>/channels/<typeId>/}.
@@ -44,32 +46,36 @@ final class ChannelStore {
      * Returns the new content hash to record, or {@code null} when unchanged/failed.
      */
     @Nullable
-    <S> String save(@Nonnull SyncChannel<S> channel) {
+    <S> CompletableFuture<SaveResult> save(@Nonnull SyncChannel<S> channel) {
         SyncChannelType<S> type = channel.type();
         try {
-            BsonDocument doc = type.codec().encode(channel.read()).asDocument();
-            String hash = Hashing.sha256Hex(doc.toJson());
-            if (hash.equals(channel.savedHash())) {
+            SyncChannel.Snapshot snapshot = channel.snapshot();
+            if (snapshot.hash().equals(channel.savedHash())) {
                 return null;
             }
-            BsonUtil.writeDocument(pathFor(type, channel.id()), doc);
-            return hash;
+            Path path = pathFor(type, channel.id());
+            return Universe.get().getStorageManager()
+                    .doSave(path, () -> BsonUtil.writeDocument(path, snapshot.document()))
+                    .thenApply(ignored -> new SaveResult(snapshot.sequence(), snapshot.hash()));
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
                     "[ChannelStore] Failed to save channel %s/%s", type.typeId(), channel.id());
-            return null;
+            return CompletableFuture.failedFuture(e);
         }
     }
 
     /** Synchronously flushes a channel's state (used on shutdown). */
     <S> void saveBlocking(@Nonnull SyncChannel<S> channel) {
-        SyncChannelType<S> type = channel.type();
         try {
-            BsonDocument doc = type.codec().encode(channel.read()).asDocument();
-            BsonUtil.writeDocument(pathFor(type, channel.id()), doc).join();
+            CompletableFuture<SaveResult> future = save(channel);
+            if (future != null) {
+                SaveResult result = future.join();
+                channel.markSaved(result.sequence(), result.hash());
+            }
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
-                    "[ChannelStore] Failed to flush channel %s/%s", type.typeId(), channel.id());
+                    "[ChannelStore] Failed to flush channel %s/%s",
+                    channel.type().typeId(), channel.id());
         }
     }
 
@@ -132,9 +138,18 @@ final class ChannelStore {
 
     private void deleteQuietly(@Nonnull Path path) {
         try {
-            Files.deleteIfExists(path);
-        } catch (IOException e) {
+            Universe.get().getStorageManager().doSave(path, () -> {
+                try {
+                    Files.deleteIfExists(path);
+                    return CompletableFuture.completedFuture(null);
+                } catch (IOException error) {
+                    return CompletableFuture.failedFuture(error);
+                }
+            }).join();
+        } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("[ChannelStore] Failed to delete %s", path);
         }
     }
+
+    record SaveResult(long sequence, @Nonnull String hash) {}
 }

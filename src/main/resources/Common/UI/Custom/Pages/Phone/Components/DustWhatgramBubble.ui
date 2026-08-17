@@ -1,0 +1,20 @@
+// One chat message bubble, appended into #WhatgramContent (chat view).
+// Contract: the app sets #Sender.Text, #Body.Text and recolors the row root
+// (#Bubble) via its .Background to distinguish sent vs received messages.
+$D = "../../DustLib.ui";
+
+Group #Bubble {
+  LayoutMode: Top;
+  Anchor: (Bottom: 6);
+  Padding: (Full: 8);
+  Background: $D.@DustPanelAltBackground;
+
+  Label #Sender {
+    Text: "Name";
+    Style: (FontSize: 10, RenderBold: true, TextColor: $D.@DustTextSecondary);
+  }
+  Label #Body {
+    Text: "Message body";
+    Style: (FontSize: 13, TextColor: $D.@DustTextPrimary, Wrap: true);
+  }
+}

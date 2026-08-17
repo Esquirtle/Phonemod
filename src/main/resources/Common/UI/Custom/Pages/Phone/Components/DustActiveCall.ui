@@ -1,0 +1,46 @@
+// Active-call overlay. Replaces the shell content area (driven by DevicePage).
+// Contract: app sets #PartnerLabel.Text and binds #HangUpButton.
+$D = "../../DustLib.ui";
+
+$D.@DustCenterScreen {
+  Group {
+    LayoutMode: Top;
+    Padding: (Full: 24);
+
+    Label {
+      Text: "In call with";
+      Anchor: (Bottom: 8);
+      Style: (FontSize: 13, Alignment: Center, TextColor: $D.@DustTextSecondary);
+    }
+    Label #PartnerLabel {
+      Text: "Unknown";
+      Anchor: (Bottom: 20);
+      Style: (FontSize: 20, Alignment: Center, RenderBold: true, TextColor: $D.@DustTextPrimary);
+    }
+
+    Group #SpeakerControls {
+      Visible: false;
+      LayoutMode: Top;
+      Anchor: (Bottom: 20);
+
+      Label #SpeakerStatus {
+        Text: "Call is PRIVATE";
+        Anchor: (Bottom: 8);
+        Style: (FontSize: 12, Alignment: Center, TextColor: $D.@DustTextSecondary);
+      }
+      $D.@DustShellSecondaryButton #SpeakerOnButton {
+        Anchor: (Width: 160, Height: 34, Bottom: 5);
+        Text: "Speaker On";
+      }
+      $D.@DustShellSecondaryButton #SpeakerOffButton {
+        Anchor: (Width: 160, Height: 34);
+        Text: "Private Audio";
+      }
+    }
+
+    $D.@DustShellDangerButton #HangUpButton {
+      Anchor: (Width: 160, Height: $D.@DustShellActionButtonHeight);
+      Text: "Hang Up";
+    }
+  }
+}
