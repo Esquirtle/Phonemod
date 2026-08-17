@@ -141,18 +141,59 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
             uniqueSenders.putIfAbsent(msg.fromNumber(), displayName);
         }
 
+        if (uniqueSenders.isEmpty()) {
+            // No conversations yet — show the empty-state card instead of rows.
+            PhoneUi.appendListItem(cmd, Whatgram.SEL_CONTENT_LIST, Whatgram.EMPTY_UI, 0);
+            return;
+        }
+
         int i = 0;
         for (Map.Entry<String, String> sender : uniqueSenders.entrySet()) {
             String fromNumber = sender.getKey();
             String displayName = sender.getValue();
             String row = PhoneUi.appendListItem(cmd, Whatgram.SEL_CONTENT_LIST, Whatgram.ENTRY_UI, i);
-            PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_NAME_TEXT),
-                    displayName + " (" + fromNumber + ")");
+            PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_NAME_TEXT), displayName);
+
+            // Last-message preview ("You:" prefix when outgoing) + relative timestamp.
+            ChatMessage last = history.getLastMessage(ctx.getPhoneNumber(), fromNumber);
+            String preview = "";
+            String time = "";
+            if (last != null) {
+                preview = (last.fromMe() ? "You: " : "") + last.body();
+                if (preview.length() > 40) {
+                    preview = preview.substring(0, 39) + "…";
+                }
+                time = formatRelativeTime(last.sentAt());
+            }
+            PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_PREVIEW_TEXT), preview);
+            PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_TIME_TEXT), time);
+
             PhoneUi.bindAction(evb, PhoneUi.child(row, Whatgram.SEL_ENTRY_BUTTON),
                     PhoneEventActions.OPEN_CHAT,
                     PhoneUi.params("Contact", fromNumber));
             i++;
         }
+    }
+
+    /**
+     * Compact relative time (now / Nm / Nh / Nd / Nw / Ny) for a conversation-row
+     * timestamp. Returns "" for a 0/legacy timestamp so the row shows no time.
+     */
+    private static String formatRelativeTime(long epochMillis) {
+        if (epochMillis <= 0L) return "";
+        long deltaMs = System.currentTimeMillis() - epochMillis;
+        if (deltaMs < 0L) deltaMs = 0L;
+        long sec = deltaMs / 1000L;
+        if (sec < 60L) return "now";
+        long min = sec / 60L;
+        if (min < 60L) return min + "m";
+        long hr = min / 60L;
+        if (hr < 24L) return hr + "h";
+        long day = hr / 24L;
+        if (day < 7L) return day + "d";
+        long wk = day / 7L;
+        if (wk < 52L) return wk + "w";
+        return (day / 365L) + "y";
     }
 
     private void renderChat(PhoneAppContext ctx, String contactNumber, UICommandBuilder cmd, UIEventBuilder evb) {
