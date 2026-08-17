@@ -228,6 +228,11 @@ String getParam(String key, String defaultValue)
 ```
 Returns the value for `key`, or `defaultValue` if absent.
 
+```java
+int slotIndex()
+```
+For an `ItemGrid` slot-click event, the clicked slot index; `-1` if the event carries no `SlotIndex`. Bind slot clicks with `PhoneUi.bindSlot` (see `events.md`).
+
 ---
 
 ## PhoneService

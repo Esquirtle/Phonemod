@@ -113,6 +113,28 @@ evb.addEventBinding(
 
 The `@` prefix is stripped from the key name before the event reaches `handleEvent`. `event.getParam("MessageValue")` retrieves the captured value; the key in `getParam` does not include `@`.
 
+### Slot clicks — clickable `ItemGrid`
+
+Bind a click on an `ItemGrid`'s slots with `PhoneUi.bindSlot`. The client appends the clicked
+slot index automatically as `SlotIndex`; read it with `PhoneEvent.slotIndex()`. Slot events
+reach `handleEvent` exactly like button actions (the phone event pipeline passes `SlotIndex`
+and any custom params through), so a data app can map the index to its cached list. `bindSlot`
+does not lock the interface (slot selection is navigation, not a mutation).
+
+```java
+// in build(): make an item grid clickable
+PhoneUi.bindSlot(evb, "#MyGrid", "select_item");
+// ...or with an extra literal param
+PhoneUi.bindSlot(evb, "#MyGrid", "select_item", PhoneUi.params("Category", categoryId));
+
+// in handleEvent():
+if ("select_item".equals(event.getAction())) {
+    int slot = event.slotIndex();               // -1 if the event carried no SlotIndex
+    if (slot >= 0 && slot < items.size()) open(items.get(slot));
+    return true;
+}
+```
+
 ## Event payload decoding
 
 `DevicePage` decodes the raw UI event into a generic `Map<String, String>` and

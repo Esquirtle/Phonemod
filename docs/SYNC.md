@@ -6,6 +6,13 @@ chats, social feeds, presence, and multiplayer game lobbies are easy to build.
 
 The model: **shared state + subscribers + automatic re-render on change.**
 
+> **Sync channels vs. `AppService.refreshApp`.** Use sync channels for genuinely *shared*
+> state that must broadcast to multiple viewers (group chats, feeds, presence, lobbies). For a
+> single player's **async data** — e.g. a DB-backed app whose service returns
+> `CompletionStage` — do **not** wire a channel as a mere refresh signal: cache the result in
+> memory and call `platform.apps().refreshApp(appId, phoneNumber)` after the completion to
+> repaint just that player's page (see `V2_API.md`).
+
 ```
 publish(type, id, mutator)
   ↓ mutate state (per-channel lock)

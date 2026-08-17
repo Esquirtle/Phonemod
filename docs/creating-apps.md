@@ -182,6 +182,38 @@ ctx.setState("view", MyState.DETAIL.name());
 
 When you use `StatefulPhoneApp`, the `__state__` key is managed automatically by `getState(ctx)` and `setState(ctx, s)`. Do not write to `__state__` manually.
 
+## Step 6b: Async data and clickable item grids
+
+`build()` runs on the world thread and must render synchronously — **never block it** on a
+service call. If your data source is async (returns `CompletionStage`), keep the results in an
+in-memory per-player cache, render from the cache, and repaint when new data arrives with
+`AppService.refreshApp` (which hops to the player's world thread for you):
+
+```java
+// capture stable ids while on the world thread
+String appId = ctx.getAppId();
+String phone = ctx.getPhoneNumber();
+myService.fetch(query).whenComplete((result, err) -> {
+    cache.put(phone, result);                                   // off-thread: just store
+    DevicePlatform.require().apps().refreshApp(appId, phone);   // any thread; framework repaints
+});
+// build() then renders cache.get(phone) synchronously
+```
+
+To make an `ItemGrid` clickable, bind the slots and read the clicked index:
+
+```java
+PhoneUi.bindSlot(evb, "#MyGrid", "select_item");     // in build()
+// in handleEvent():
+if ("select_item".equals(event.getAction())) {
+    int slot = event.slotIndex();                    // -1 if not a slot click
+    ...
+}
+```
+
+See `V2_API.md` (`refreshApp`) and `events.md` (slot clicks); prefer `refreshApp` over a sync
+channel used only as a refresh signal (`SYNC.md`).
+
 ## Step 7: Handle incoming message/call callbacks if needed
 
 There are two overloads for incoming messages. The 4-arg version is tried first:
