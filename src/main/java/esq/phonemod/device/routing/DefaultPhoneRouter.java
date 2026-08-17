@@ -118,12 +118,15 @@ public final class DefaultPhoneRouter implements PhoneRouter {
     @Override
     public void route(@Nonnull RouteContext context) {
         Route route = routes.get(context.getAction());
-        if (route != null) {
-            if (guardsPass(route, context)) {
-                apply(context, execute(route, context));
-            } else {
-                apply(context, RouteResult.empty());
-            }
+        // A matched route whose guards all pass handles the action directly.
+        // If no route matches, OR the matched route's guards reject the action,
+        // fall through to the app fallback so the current app can handle it. This
+        // is the documented RouteGuard failure contract ("falls through to the
+        // fallback route") and what the app-fallback route metadata advertises
+        // ("guard-rejected actions"); e.g. open_chat fired from inside Whatgram is
+        // rejected by CurrentAppIsNotGuard so WhatgramApp.handleEvent opens the chat.
+        if (route != null && guardsPass(route, context)) {
+            apply(context, execute(route, context));
             return;
         }
         if (context.getSession().getCurrentState() == DevicePageState.APP
