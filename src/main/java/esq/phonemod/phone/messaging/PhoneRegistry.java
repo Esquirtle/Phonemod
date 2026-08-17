@@ -291,6 +291,7 @@ public final class PhoneRegistry {
         ConversationHistoryComponent component =
                 store.ensureAndGetComponent(ref, ConversationHistoryComponent.getComponentType());
         component.addMessage(ownNumber, contactNumber, message);
+        component.incrementUnread(ownNumber, contactNumber);
         store.putComponent(ref, ConversationHistoryComponent.getComponentType(), component);
     }
 

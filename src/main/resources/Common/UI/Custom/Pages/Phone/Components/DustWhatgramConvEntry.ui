@@ -1,13 +1,25 @@
 // One conversation-list row, appended into #WhatgramContent.
-// Two-line layout: name + relative time on the top row, last-message preview
-// beneath. Contract: the app sets #Name.Text, #Time.Text, #Preview.Text and
-// binds #Button (opens the chat). Kept intentionally to proven constructs only
-// (plain Group/Label + the existing $D.@Dust* templates) — the client .ui parser
-// is not in the shared source, so a boot cannot validate this document.
+// Avatar (contact initial) + two-line text (name + relative time / last-message
+// preview) + an unread badge + an Open button. Contract: the app sets
+// #AvatarInitial.Text, #Name.Text, #Time.Text, #Preview.Text, #DustBadgeValue.Text,
+// toggles #UnreadWrap.Visible, and binds #Button (opens the chat).
+// Proven constructs only — the client .ui parser is not in the shared source, so a
+// build/boot cannot validate this document; only Alignment:Center is valid.
 $D = "../../DustLib.ui";
 
 $D.@DustShellListEntry #WhatgramConvEntry {
   Anchor: (Height: 62, Bottom: 6);
+
+  // Avatar tile — contact initial, centred.
+  Group #Avatar {
+    Anchor: (Width: 44, Height: 44, Right: 10);
+    Background: $D.@DustShellActionButtonBackground;
+    Label #AvatarInitial {
+      FlexWeight: 1;
+      Text: "?";
+      Style: (FontSize: 18, RenderBold: true, Alignment: Center, VerticalAlignment: Center, TextColor: $D.@DustTextPrimary);
+    }
+  }
 
   // Name (bold) + last-message preview (muted), stacked.
   Group #TextCol {
@@ -23,9 +35,8 @@ $D.@DustShellListEntry #WhatgramConvEntry {
         Text: "Name";
         Style: (FontSize: 14, RenderBold: true, TextColor: $D.@DustTextPrimary);
       }
-      // Right-positioned by layout (Name carries FlexWeight:1 above), not by text
-      // alignment: the client .ui parser only accepts Alignment:Center, so
-      // Alignment:Right/Left crash the whole pack. Left off deliberately.
+      // Right-positioned by layout (Name carries FlexWeight:1), not text alignment:
+      // the parser only accepts Alignment:Center, so Right/Left crash the pack.
       Label #Time {
         Anchor: (Width: 54);
         Text: "";
@@ -38,6 +49,14 @@ $D.@DustShellListEntry #WhatgramConvEntry {
       Text: "";
       Style: (FontSize: 11, TextColor: $D.@DustTextSecondary);
     }
+  }
+
+  // Unread badge — the wrapper carries layout + visibility because the badge
+  // template is hole-less (no @Anchor); raw Anchor/Visible on it would risk a crash.
+  Group #UnreadWrap {
+    Visible: false;
+    Anchor: (Width: 24, Height: 24, Right: 8);
+    $D.@DustShellNotificationBadge #Unread { }
   }
 
   // Open affordance — a proven clickable TextButton; app binds open_chat here.

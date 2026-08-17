@@ -42,12 +42,24 @@ public final class ConversationHistoryComponent implements Component<EntityStore
                             (data, value) -> data.history = value,
                             data -> data.history)
                     .add()
+                    .append(
+                            // own number → contact number → unread incoming count.
+                            // Optional key: legacy data without it decodes to an empty map.
+                            new KeyedCodec<>("Unread",
+                                    new MapCodec<>(
+                                            new MapCodec<>(com.hypixel.hytale.codec.Codec.INTEGER, HashMap::new, false),
+                                            HashMap::new, false)),
+                            (data, value) -> data.unread = value,
+                            data -> data.unread)
+                    .add()
                     .build();
 
     // ── Fields ────────────────────────────────────────────────────────────────
 
     /** own phone number → contact phone number → ordered message array (oldest first). */
     private Map<String, Map<String, ChatMessage[]>> history;
+    /** own phone number → contact phone number → unread incoming message count. */
+    private Map<String, Map<String, Integer>> unread;
     private int schemaVersion = 2;
 
     // ── Constructors ──────────────────────────────────────────────────────────
@@ -55,6 +67,7 @@ public final class ConversationHistoryComponent implements Component<EntityStore
     /** Default constructor — required by {@link BuilderCodec}. */
     public ConversationHistoryComponent() {
         this.history = new HashMap<>();
+        this.unread = new HashMap<>();
     }
 
     /** Copy constructor used by {@link #clone()}. */
@@ -66,6 +79,10 @@ public final class ConversationHistoryComponent implements Component<EntityStore
                 innerCopy.put(inner.getKey(), inner.getValue().clone());
             }
             this.history.put(outer.getKey(), innerCopy);
+        }
+        this.unread = new HashMap<>();
+        for (Map.Entry<String, Map<String, Integer>> outer : source.unread.entrySet()) {
+            this.unread.put(outer.getKey(), new HashMap<>(outer.getValue()));
         }
     }
 
@@ -148,8 +165,31 @@ public final class ConversationHistoryComponent implements Component<EntityStore
         return contacts != null ? Collections.unmodifiableSet(contacts.keySet()) : Collections.emptySet();
     }
 
+    // ── Unread counts ─────────────────────────────────────────────────────────
+
+    /** Unread incoming messages from {@code contactNumber} for {@code ownNumber}. */
+    public int getUnread(@Nonnull String ownNumber, @Nonnull String contactNumber) {
+        Map<String, Integer> contacts = unread.get(ownNumber);
+        if (contacts == null) return 0;
+        Integer count = contacts.get(contactNumber);
+        return count != null ? count : 0;
+    }
+
+    /** Increments the unread count for a received message (caller persists via putComponent). */
+    public void incrementUnread(@Nonnull String ownNumber, @Nonnull String contactNumber) {
+        unread.computeIfAbsent(ownNumber, k -> new HashMap<>()).merge(contactNumber, 1, Integer::sum);
+    }
+
+    /** Clears the unread count once the conversation is opened/viewed. */
+    public void clearUnread(@Nonnull String ownNumber, @Nonnull String contactNumber) {
+        Map<String, Integer> contacts = unread.get(ownNumber);
+        if (contacts != null) contacts.remove(contactNumber);
+    }
+
     public void remapDevice(@Nonnull String oldAddress, @Nonnull String newAddress) {
         Map<String, ChatMessage[]> old = history.remove(oldAddress);
         if (old != null) history.putIfAbsent(newAddress, old);
+        Map<String, Integer> oldUnread = unread.remove(oldAddress);
+        if (oldUnread != null) unread.putIfAbsent(newAddress, oldUnread);
     }
 }

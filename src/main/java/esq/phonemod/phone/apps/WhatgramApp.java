@@ -154,6 +154,11 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
             String row = PhoneUi.appendListItem(cmd, Whatgram.SEL_CONTENT_LIST, Whatgram.ENTRY_UI, i);
             PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_NAME_TEXT), displayName);
 
+            // Avatar initial — first letter of the display name.
+            String initial = displayName == null || displayName.isBlank()
+                    ? "?" : displayName.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+            PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_AVATAR_TEXT), initial);
+
             // Last-message preview ("You:" prefix when outgoing) + relative timestamp.
             ChatMessage last = history.getLastMessage(ctx.getPhoneNumber(), fromNumber);
             String preview = "";
@@ -167,6 +172,16 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
             }
             PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_PREVIEW_TEXT), preview);
             PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_TIME_TEXT), time);
+
+            // Unread badge — shown only when there are unread incoming messages.
+            int unreadCount = history.getUnread(ctx.getPhoneNumber(), fromNumber);
+            if (unreadCount > 0) {
+                PhoneUi.setText(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_UNREAD_TEXT),
+                        unreadCount > 9 ? "9+" : String.valueOf(unreadCount));
+                PhoneUi.setVisible(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_UNREAD_WRAP), true);
+            } else {
+                PhoneUi.setVisible(cmd, PhoneUi.child(row, Whatgram.SEL_ENTRY_UNREAD_WRAP), false);
+            }
 
             PhoneUi.bindAction(evb, PhoneUi.child(row, Whatgram.SEL_ENTRY_BUTTON),
                     PhoneEventActions.OPEN_CHAT,
@@ -233,6 +248,7 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
             if (contact != null && !contact.isBlank()) {
                 ctx.setState(KEY_CONTACT, contact);
                 setState(ctx, State.CHAT);
+                clearUnread(ctx, contact);
                 build(ctx, cmd, evb);
                 return true;
             }
@@ -314,6 +330,9 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
         LOGGER.atFine().log("[WhatgramApp] onIncomingMessage phone=%s from=%s currentContact=%s state=%s",
                 ctx.getPhoneNumber(), fromNumber, currentContact, state);
         if (state == State.CHAT && fromNumber.equals(currentContact)) {
+            // The recipient is looking at this exact chat — the message is read on
+            // arrival, so clear its unread count before rebuilding the list.
+            clearUnread(ctx, currentContact);
             // Rebuild the whole list from history (a partial update to
             // #WhatgramContent — the root is already on the client). This avoids
             // any index drift between the displayed bubbles and history.
@@ -341,6 +360,15 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /** Resets the unread count for a conversation once it has been opened/viewed. */
+    private void clearUnread(PhoneAppContext ctx, String contactNumber) {
+        ConversationHistoryComponent history = ctx.getStore().ensureAndGetComponent(
+                ctx.getRef(), ConversationHistoryComponent.getComponentType());
+        history.clearUnread(ctx.getPhoneNumber(), contactNumber);
+        ctx.getStore().putComponent(
+                ctx.getRef(), ConversationHistoryComponent.getComponentType(), history);
+    }
 
     /**
      * Clears {@code #WhatgramContent} and re-appends every message bubble from

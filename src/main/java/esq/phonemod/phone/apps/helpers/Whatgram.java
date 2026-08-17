@@ -53,6 +53,12 @@ public final class Whatgram {
     public static final String SEL_CONTENT_LIST = "#WhatgramContent";
 
     // Conversation-row children (relative to an appended ENTRY_UI row).
+    /** Relative: avatar initial label inside a conversation row. */
+    public static final String SEL_ENTRY_AVATAR_TEXT = "#AvatarInitial.Text";
+    /** Relative: unread-badge wrapper (toggled visible when there are unread messages). */
+    public static final String SEL_ENTRY_UNREAD_WRAP = "#UnreadWrap";
+    /** Relative: unread count label inside the badge. */
+    public static final String SEL_ENTRY_UNREAD_TEXT = "#DustBadgeValue.Text";
     /** Relative: name label inside a conversation row. */
     public static final String SEL_ENTRY_NAME_TEXT = "#Name.Text";
     /** Relative: last-message preview label inside a conversation row. */
