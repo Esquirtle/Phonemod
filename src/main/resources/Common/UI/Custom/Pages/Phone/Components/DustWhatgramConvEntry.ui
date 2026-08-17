@@ -1,17 +1,48 @@
 // One conversation-list row, appended into #WhatgramContent.
-// Contract: the app sets #Name.Text and binds #Button (opens the chat).
+// Two-line layout: name + relative time on the top row, last-message preview
+// beneath. Contract: the app sets #Name.Text, #Time.Text, #Preview.Text and
+// binds #Button (opens the chat). Kept intentionally to proven constructs only
+// (plain Group/Label + the existing $D.@Dust* templates) — the client .ui parser
+// is not in the shared source, so a boot cannot validate this document.
 $D = "../../DustLib.ui";
 
 $D.@DustShellListEntry #WhatgramConvEntry {
-  Anchor: (Height: $D.@DustShellListEntryHeight, Bottom: 6);
+  Anchor: (Height: 62, Bottom: 6);
 
-  Label #Name {
+  // Name (bold) + last-message preview (muted), stacked.
+  Group #TextCol {
     FlexWeight: 1;
-    Text: "Name";
-    Style: (FontSize: 14, TextColor: $D.@DustTextPrimary);
+    LayoutMode: Top;
+
+    Group #TopRow {
+      Anchor: (Height: 22);
+      LayoutMode: Left;
+
+      Label #Name {
+        FlexWeight: 1;
+        Text: "Name";
+        Style: (FontSize: 14, RenderBold: true, TextColor: $D.@DustTextPrimary);
+      }
+      // Right-positioned by layout (Name carries FlexWeight:1 above), not by text
+      // alignment: the client .ui parser only accepts Alignment:Center, so
+      // Alignment:Right/Left crash the whole pack. Left off deliberately.
+      Label #Time {
+        Anchor: (Width: 54);
+        Text: "";
+        Style: (FontSize: 10, TextColor: $D.@DustTextSecondary);
+      }
+    }
+
+    Label #Preview {
+      Anchor: (Height: 18);
+      Text: "";
+      Style: (FontSize: 11, TextColor: $D.@DustTextSecondary);
+    }
   }
+
+  // Open affordance — a proven clickable TextButton; app binds open_chat here.
   $D.@DustShellActionButton #Button {
-    Anchor: (Width: 64, Height: 38);
+    Anchor: (Width: 60, Height: 40, Left: 8);
     Text: "Open";
   }
 }
