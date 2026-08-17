@@ -46,4 +46,19 @@ public final class PhoneEvent {
     public String getParam(String key, String defaultValue) {
         return params.getOrDefault(key, defaultValue);
     }
+
+    /**
+     * The clicked slot index for an ItemGrid slot-click event, or {@code -1} if the event
+     * carries no {@code SlotIndex} (i.e. it was not a slot click). The client appends the
+     * index automatically to a slot-click binding — bind one with {@link PhoneUi#bindSlot}.
+     */
+    public int slotIndex() {
+        String raw = params.get("SlotIndex");
+        if (raw == null) return -1;
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
 }

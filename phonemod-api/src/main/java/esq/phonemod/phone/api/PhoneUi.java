@@ -98,6 +98,33 @@ public final class PhoneUi {
     }
 
     /**
+     * Binds a click on an {@code ItemGrid}'s slots to an app action. The clicked slot index
+     * arrives as the {@code SlotIndex} param — read it in {@code handleEvent} via
+     * {@link PhoneEvent#slotIndex()}. Slot events reach the app exactly like button actions,
+     * so a data app can map the index to its cached list. Does not lock the interface (slot
+     * selection is navigation, not a mutation).
+     */
+    public static void bindSlot(@Nonnull UIEventBuilder evb,
+            @Nonnull String gridSelector,
+            @Nonnull String action) {
+        evb.addEventBinding(CustomUIEventBindingType.SlotClickPressWhileDragging,
+                gridSelector, EventData.of("Action", action), false);
+    }
+
+    /** {@link #bindSlot(UIEventBuilder, String, String)} with extra literal params merged in. */
+    public static void bindSlot(@Nonnull UIEventBuilder evb,
+            @Nonnull String gridSelector,
+            @Nonnull String action,
+            @Nonnull EventData extraParams) {
+        EventData data = EventData.of("Action", action);
+        for (Map.Entry<String, String> entry : extraParams.events().entrySet()) {
+            data.append(entry.getKey(), entry.getValue());
+        }
+        evb.addEventBinding(CustomUIEventBindingType.SlotClickPressWhileDragging,
+                gridSelector, data, false);
+    }
+
+    /**
      * Binds a button to open an app by ID.
      * Equivalent to {@code EventData.of("Action", "open_app").append("App", appId)}.
      */

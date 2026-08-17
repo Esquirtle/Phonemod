@@ -9,6 +9,7 @@ import esq.phonemod.api.DeviceApp;
 import esq.phonemod.api.DeviceActionResult;
 import esq.phonemod.phone.api.PhoneApp;
 import esq.phonemod.phone.core.PhoneService;
+import esq.phonemod.phone.messaging.PhoneRegistry;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -87,6 +88,15 @@ public final class RuntimeAppService implements AppService {
     @Override public Collection<AppDescriptor> snapshot() {
         return snapshot.values().stream().map(Entry::app).distinct()
                 .map(DeviceApp::descriptor).toList();
+    }
+
+    @Override public void refreshApp(@Nonnull String appId, @Nonnull String phoneNumber) {
+        // Same push path the sync layer uses (SyncService.broadcast): resolve the online
+        // phone, hop to its world thread, and re-render the app if it is the one open.
+        PhoneRegistry.OnlineEntry entry = PhoneRegistry.getOnlineEntry(phoneNumber);
+        if (entry != null) {
+            entry.world().execute(() -> entry.page().refreshApp(appId));
+        }
     }
 
     private void unregister(String canonicalId) {

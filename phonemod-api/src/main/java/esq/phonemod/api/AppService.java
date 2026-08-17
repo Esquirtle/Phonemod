@@ -16,4 +16,20 @@ public interface AppService {
             @Nonnull PhoneApp<?> app);
     @Nonnull Optional<DeviceApp> find(@Nonnull String canonicalIdOrAlias);
     @Nonnull Collection<AppDescriptor> snapshot();
+
+    /**
+     * Requests a repaint of {@code appId} on the given phone's currently-open page — safe to
+     * call from <em>any</em> thread. The framework hops to that player's world thread and
+     * re-renders the app; it is a no-op if the phone is offline or a different app is open.
+     *
+     * <p>This is the supported way for an async, data-backed app (e.g. one whose service
+     * returns {@link java.util.concurrent.CompletionStage}) to refresh after a completion
+     * fires off the world thread — the app renders synchronously from its own cache and calls
+     * {@code refreshApp(getId(), phoneNumber)} when new data is ready, instead of wiring a
+     * sync channel purely as a refresh signal.
+     *
+     * @param appId       the app's id (e.g. {@code app.getId()})
+     * @param phoneNumber the target phone number ({@code PhoneAppContext.getPhoneNumber()})
+     */
+    void refreshApp(@Nonnull String appId, @Nonnull String phoneNumber);
 }
