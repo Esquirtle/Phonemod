@@ -269,13 +269,26 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
     public boolean onIncomingMessage(PhoneAppContext ctx, String fromNumber,
             UICommandBuilder cmd, UIEventBuilder evb) {
         String currentContact = ctx.getState(KEY_CONTACT);
+        State state = getState(ctx);
         LOGGER.atFine().log("[WhatgramApp] onIncomingMessage phone=%s from=%s currentContact=%s state=%s",
-                ctx.getPhoneNumber(), fromNumber, currentContact, getState(ctx));
-        if (getState(ctx) == State.CHAT && fromNumber.equals(currentContact)) {
+                ctx.getPhoneNumber(), fromNumber, currentContact, state);
+        if (state == State.CHAT && fromNumber.equals(currentContact)) {
             // Rebuild the whole list from history (a partial update to
             // #WhatgramContent — the root is already on the client). This avoids
             // any index drift between the displayed bubbles and history.
             renderMessages(ctx, currentContact, cmd);
+            return true;
+        }
+        if (state == State.CONVERSATION_LIST) {
+            // Recipient is viewing the conversation list when a message arrives:
+            // live-refresh the list in place so the new/updated conversation shows
+            // up without reopening the app. This is a partial update to
+            // #WhatgramContent + the header only — the app root is already on the
+            // client, so we MUST return true here. Returning false would let
+            // DevicePage fall back to a full build()/appendMainUI, which re-appends
+            // the already-present root and leaves the recipient with a broken (or
+            // unchanged) list — the "conversation never opens for the receiver" bug.
+            renderConversationList(ctx, cmd, evb);
             return true;
         }
         return false;
