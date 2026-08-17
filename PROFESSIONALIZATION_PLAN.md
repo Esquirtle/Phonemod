@@ -30,12 +30,16 @@ the boot):
   `CallSession` state machine all exist and pass tests. **Still open:** the forged-action /
   audio-leak *multiplayer* acceptance pass, and runtime proof of world-thread dispatch &
   packet-filter handle deregistration.
-- **2.0 Alpha — API + identity LARGELY DONE; migration THIN.** Module split, `phonemod-api`,
-  `DevicePlatform`/services, `identity/` UUID registry (+ codec document + tests), and the
-  `/deviceframework` command (status, migration dry-run/status/conflicts/repair, transfer,
-  release) are in. **Gap:** `migration/PlayerDeviceDataMigrator` is a ~35-line `remap`
-  stub — the timestamped-backup, idempotent double-run, `PhoneNumber`→UUID conversion,
-  duplicate-item claimant remap, and migration fixtures/rehearsal are not built.
+- **2.0 Alpha — API + identity + migration DONE (test-evidenced).** Module split,
+  `phonemod-api`, `DevicePlatform`/services, `identity/` UUID registry (+ codec document),
+  and the `/deviceframework` command (status, migration dry-run/status/conflicts/repair,
+  transfer, release) are in. The migration engine was **already implemented** (not a stub:
+  `PhoneNumber`→UUID via `IdentityRegistry.claimLegacy`, first-claimant/duplicate resolution,
+  timestamped `.pre-v2` backup via `ensureBackupLocked`, no-overwrite component remap,
+  `SchemaVersion` on all six components) and is now covered by 33 passing unit tests proving
+  backup-once, double-run byte-equivalence, concurrent-claim resolution, and PhoneNumber→UUID.
+  **Remaining Alpha gaps:** mailbox/sync-channel bounded persistence, `SchemaVersion`-gated
+  branch logic (currently write-only), and the dry-run/rehearsal/rollback **exit-gate evidence**.
 - **2.0 Beta — PARTIAL.** `AssetHealthService` + `OperationalMetrics` seeds exist; the Dust
   shared-design-system rebuild, responsive terminal/desktop shell, startup-failing asset
   validation, bounded retention/pruning, and structured no-PII logging are not done.
@@ -275,11 +279,11 @@ contract or persistence model.
 - [ ] Persist offline mailboxes and sync channels in bounded per-address/per-channel files
   using ordered saves.
 - [ ] Add schema versions to every framework-owned component and document.
-- [ ] Make migrations idempotent and create a timestamped backup before the first v2
+- [x] Make migrations idempotent and create a timestamped backup before the first v2
   mutation.
-- [ ] On first v2 use, convert legacy `PhoneNumber` metadata to a UUID identity.
-- [ ] Let the first legitimate claimant retain the old address.
-- [ ] Give duplicate legacy items a new address and remap that player's contacts,
+- [x] On first v2 use, convert legacy `PhoneNumber` metadata to a UUID identity.
+- [x] Let the first legitimate claimant retain the old address.
+- [x] Give duplicate legacy items a new address and remap that player's contacts,
   histories, installs, settings, and app state without overwriting another owner.
 - [ ] Keep stable identity UUID/address during an explicit transfer while leaving the old
   owner's history and application data private. The new owner receives clean defaults.
@@ -294,7 +298,7 @@ contract or persistence model.
 - [ ] Identity tests cover claims, copied metadata, duplicate simultaneous claims,
   explicit transfer, release, shared devices, and conflicts.
 - [ ] Migration fixtures cover every current component/document/channel schema.
-- [ ] Running each migration twice produces byte-equivalent canonical data and no second
+- [x] Running each migration twice produces byte-equivalent canonical data and no second
   backup or mutation.
 - [ ] Retention and ordered-save tests cover offline mailboxes and sync-channel files.
 - [ ] V1 consumers compile and run unchanged through the compatibility bridge.
