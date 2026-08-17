@@ -2,6 +2,7 @@ package esq.phonemod.identity;
 
 import com.hypixel.hytale.codec.util.RawJsonReader;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.universe.StorageManager;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.util.BsonUtil;
 import esq.phonemod.api.DeviceIdentity;
@@ -30,6 +31,7 @@ public final class IdentityRegistry {
     private final Map<UUID, IdentityRecord> byId = new HashMap<>();
     private final Map<String, UUID> byAddress = new HashMap<>();
     private Path path;
+    private StorageManager storageManager;
     private CompletableFuture<Void> pendingSave = CompletableFuture.completedFuture(null);
     private boolean backupCreated;
     private int conflicts;
@@ -38,8 +40,25 @@ public final class IdentityRegistry {
     public IdentityRegistry() { this(true); }
     IdentityRegistry(boolean persistenceEnabled) { this.persistenceEnabled = persistenceEnabled; }
 
+    /**
+     * Test-only constructor: persists at an explicit path through an explicit
+     * {@link StorageManager} instead of {@link Universe#get()}, so migration/backup/idempotency
+     * behavior is verifiable without a running server.
+     */
+    IdentityRegistry(@Nonnull Path testPath, @Nonnull StorageManager testStorageManager) {
+        this.persistenceEnabled = true;
+        this.path = testPath;
+        this.storageManager = testStorageManager;
+        loadFrom(testPath);
+    }
+
     public void load() {
         path = Universe.get().getPath().resolve("Phonemod").resolve("device-identities.json");
+        storageManager = Universe.get().getStorageManager();
+        loadFrom(path);
+    }
+
+    private void loadFrom(@Nonnull Path path) {
         if (!Files.exists(path)) return;
         try {
             IdentityDocument document = RawJsonReader.readSyncWithBak(path, IdentityDocument.CODEC, logger());
@@ -263,7 +282,7 @@ public final class IdentityRegistry {
                 .toArray(IdentityRecord[]::new);
         var encoded = IdentityDocument.CODEC.encode(document).asDocument();
         Path target = path;
-        pendingSave = Universe.get().getStorageManager().doSave(
+        pendingSave = storageManager.doSave(
                 target, () -> BsonUtil.writeDocument(target, encoded));
         pendingSave.whenComplete((ignored, error) -> {
             if (error != null) {
