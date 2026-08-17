@@ -6,20 +6,69 @@
 // selectors (#WhatgramHeader / #WhatgramPanel / #WhatgramContent) alive at all
 // times, which is what previously crashed when the chat view replaced the root.
 //
-//   #WhatgramHeader   @DustAppBar — "Whatgram" (list) OR back/name/Call (chat)
-//     #BackButton / #HeaderTitle / #ActionButton
+//   #WhatgramHeader   Whatgram-specific app bar (NOT the shared @DustAppbar, so
+//                     GroupChat is unaffected). Chat view reveals #HeaderAvatar +
+//                     #HeaderSubtitle; list view hides them. Ids #BackButton /
+//                     #HeaderTitle / #ActionButton are preserved for the Java app.
 //   #WhatgramPanel    themed panel surface (role: appPanel)
 //     #WhatgramContent  scrolling list — conversation rows OR message bubbles
 //     #WhatgramComposer @DustShellMessageInput (#DustMessageInput / #DustSendButton)
+//
+// Proven constructs only (client .ui parser is not in the shared source; only
+// Alignment:Center is valid). LayoutMode:Left mirrors the conversation rows.
 $D = "../DustLib.ui";
 
 Group {
   FlexWeight: 1;
   LayoutMode: Top;
 
-  // Header doubles as the chat top bar. Back/Call start hidden; the app reveals
-  // them and retitles #HeaderTitle when a chat is open. Themeable: appHeader.
-  $D.@DustAppBar #WhatgramHeader { @Title = "Whatgram"; @ActionText = "Call"; }
+  // Header doubles as the chat top bar (role: appHeader). In the chat view the
+  // app reveals the back button, contact avatar, name + number subtitle, and Call.
+  Group #WhatgramHeader {
+    LayoutMode: Left;
+    Anchor: (Height: 52);
+    Background: $D.@DustShellHeaderBackground;
+    Padding: (Horizontal: $D.@DustShellPadding);
+
+    $D.@DustShellActionButton #BackButton {
+      Visible: false;
+      Anchor: (Width: 48, Height: 32, Right: 8);
+      Text: "Back";
+    }
+
+    // Contact avatar — chat view only.
+    Group #HeaderAvatar {
+      Visible: false;
+      Anchor: (Width: 38, Height: 38, Right: 10);
+      Background: $D.@DustShellActionButtonBackground;
+      Label #HeaderAvatarInitial {
+        FlexWeight: 1;
+        Text: "?";
+        Style: (FontSize: 16, RenderBold: true, Alignment: Center, VerticalAlignment: Center, TextColor: $D.@DustTextPrimary);
+      }
+    }
+
+    // Title ("Whatgram" in list, contact name in chat) + number subtitle.
+    Group #HeaderTextCol {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Label #HeaderTitle {
+        Text: "Whatgram";
+        Style: (FontSize: 15, RenderBold: true, Alignment: Center, TextColor: $D.@DustTextPrimary);
+      }
+      Label #HeaderSubtitle {
+        Anchor: (Height: 14);
+        Text: "";
+        Style: (FontSize: 10, Alignment: Center, TextColor: $D.@DustTextSecondary);
+      }
+    }
+
+    $D.@DustShellActionButton #ActionButton {
+      Visible: false;
+      Anchor: (Width: 48, Height: 32, Left: 8);
+      Text: "Call";
+    }
+  }
 
   // Themed panel (role: appPanel) holding the list and the composer.
   $D.@DustShellPanel #WhatgramPanel {

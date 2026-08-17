@@ -37,8 +37,14 @@ public final class Whatgram {
     public static final String SEL_HEADER_TITLE_TEXT = "#WhatgramHeader #HeaderTitle.Text";
     /** Back button (@DustAppBar leading) — visible only in the chat view. */
     public static final String SEL_HEADER_BACK_BUTTON = "#WhatgramHeader #BackButton";
-    /** Trailing action button (@DustAppBar, labelled "Call") — chat view only. */
+    /** Trailing action button (labelled "Call") — chat view only. */
     public static final String SEL_HEADER_ACTION_BUTTON = "#WhatgramHeader #ActionButton";
+    /** Contact avatar tile in the chat top bar — shown only in the chat view. */
+    public static final String SEL_HEADER_AVATAR = "#WhatgramHeader #HeaderAvatar";
+    /** Contact avatar initial label in the chat top bar. */
+    public static final String SEL_HEADER_AVATAR_TEXT = "#WhatgramHeader #HeaderAvatarInitial.Text";
+    /** Subtitle line (contact number) under the chat title. */
+    public static final String SEL_HEADER_SUBTITLE_TEXT = "#WhatgramHeader #HeaderSubtitle.Text";
 
     // ── Themeable root surfaces (one source of truth; see getThemeableSelectors) ─
 

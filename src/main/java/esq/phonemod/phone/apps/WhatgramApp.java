@@ -112,10 +112,12 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
     // ── Rendering ─────────────────────────────────────────────────────────────
 
     private void renderConversationList(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
-        // List view: plain "Whatgram" title, no chat chrome.
+        // List view: plain "Whatgram" title, no chat chrome (no avatar/subtitle).
         PhoneUi.setText(cmd, Whatgram.SEL_HEADER_TITLE_TEXT, "Whatgram");
         PhoneUi.setVisible(cmd, Whatgram.SEL_HEADER_BACK_BUTTON, false);
         PhoneUi.setVisible(cmd, Whatgram.SEL_HEADER_ACTION_BUTTON, false);
+        PhoneUi.setVisible(cmd, Whatgram.SEL_HEADER_AVATAR, false);
+        PhoneUi.setText(cmd, Whatgram.SEL_HEADER_SUBTITLE_TEXT, "");
         PhoneUi.setVisible(cmd, Whatgram.SEL_COMPOSER, false);
 
         // Clear only THIS app's list container — never the shell content area
@@ -224,6 +226,15 @@ public final class WhatgramApp extends StatefulPhoneApp<WhatgramApp.State> {
         PhoneUi.setVisible(cmd, Whatgram.SEL_HEADER_BACK_BUTTON, true);
         PhoneUi.setVisible(cmd, Whatgram.SEL_HEADER_ACTION_BUTTON, true);
         PhoneUi.setVisible(cmd, Whatgram.SEL_COMPOSER, true);
+
+        // Chat top bar: contact avatar initial + number subtitle (omit the subtitle
+        // when the display name is just the number, to avoid showing it twice).
+        String headerInitial = displayName == null || displayName.isBlank()
+                ? "?" : displayName.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
+        PhoneUi.setText(cmd, Whatgram.SEL_HEADER_AVATAR_TEXT, headerInitial);
+        PhoneUi.setVisible(cmd, Whatgram.SEL_HEADER_AVATAR, true);
+        PhoneUi.setText(cmd, Whatgram.SEL_HEADER_SUBTITLE_TEXT,
+                displayName.equals(contactNumber) ? "" : contactNumber);
 
         renderMessages(ctx, contactNumber, cmd);
 
