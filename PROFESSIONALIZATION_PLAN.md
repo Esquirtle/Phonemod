@@ -5,6 +5,43 @@ for sequencing, compatibility, test coverage, and release readiness. Architectur
 details in the existing `docs/` directory describe the current v1 implementation unless
 they explicitly say otherwise.
 
+## Reconciliation status — 2026-08-17 (verified)
+
+The checkboxes below predate a large body of implementation and had drifted out of sync.
+Reconciled against the actual tree at `2.0.0-alpha.1`, with the following **verified-green**
+baseline (Docker `maven:3.9-eclipse-temurin-25`, JDK 25):
+
+- **Build:** both modules `BUILD SUCCESS` (`phonemod-api` + `phonemod-runtime`).
+- **Tests:** 26 unit tests, 0 failures — CallSession, TokenBucket, UiEventValidator,
+  UiEventDecoder, IdentityRegistry, MigrationComponent, PhonemodConfig, DeviceSettings,
+  ApiContract, PhoneRegistryPreferences, SettingsUiContract.
+- **Package:** `scripts/assert-release-jar.sh` passes (manifest, `DevicePlatform.class`,
+  `Phone.ui`, sounds, device/item JSON, `.lang` all present in the runtime jar).
+- **Boot:** disposable server reaches `Enabled plugin esq.phonemod:Phonemod` → ENABLED,
+  asset pack loads, universe reaches ready. Only non-plugin exception is the server core's
+  `HardwareUtil.getUUID` under Docker (0 phonemod frames).
+
+Reconciled gate reality (details ticked inline below where evidenced by a passing test or
+the boot):
+
+- **1.1 security/correctness — mostly IMPLEMENTED + unit-tested.** Payload/param
+  validation (`security/UiEventValidator`, `UiSafetyLimits`), boundary decode
+  (`UiEventDecoder`), per-session rate-limit (`security/TokenBucket`), and the atomic
+  `CallSession` state machine all exist and pass tests. **Still open:** the forged-action /
+  audio-leak *multiplayer* acceptance pass, and runtime proof of world-thread dispatch &
+  packet-filter handle deregistration.
+- **2.0 Alpha — API + identity LARGELY DONE; migration THIN.** Module split, `phonemod-api`,
+  `DevicePlatform`/services, `identity/` UUID registry (+ codec document + tests), and the
+  `/deviceframework` command (status, migration dry-run/status/conflicts/repair, transfer,
+  release) are in. **Gap:** `migration/PlayerDeviceDataMigrator` is a ~35-line `remap`
+  stub — the timestamped-backup, idempotent double-run, `PhoneNumber`→UUID conversion,
+  duplicate-item claimant remap, and migration fixtures/rehearsal are not built.
+- **2.0 Beta — PARTIAL.** `AssetHealthService` + `OperationalMetrics` seeds exist; the Dust
+  shared-design-system rebuild, responsive terminal/desktop shell, startup-failing asset
+  validation, bounded retention/pruning, and structured no-PII logging are not done.
+- **2.0 RC — NOT STARTED.** Consumer migration matrix, release evidence (reproducible
+  hashes, migration rehearsal + rollback), and the in-game acceptance pass are outstanding.
+
 ## Destination
 
 Phonemod 2.0 is a public, generic Hytale device-platform SDK rather than a phone-specific
@@ -131,21 +168,21 @@ contract or persistence model.
 
 - [ ] Enforce installation, device compatibility, ownership, and permission checks in the
   server-side application-open path. UI visibility never grants authority.
-- [ ] Validate total UI payload size, action and app IDs, parameter count, key/value
+- [x] Validate total UI payload size, action and app IDs, parameter count, key/value
   lengths, action-specific fields, and current page/app/call state.
-- [ ] Catch malformed payloads at the boundary, acknowledge them safely, and avoid leaking
+- [x] Catch malformed payloads at the boundary, acknowledge them safely, and avoid leaking
   exception details to clients.
 - [ ] Lock mutation buttons until acknowledgement and make repeated action handling
   idempotent where possible.
-- [ ] Rate-limit UI actions, messages, and call attempts per player/session.
+- [x] Rate-limit UI actions, messages, and call attempts per player/session.
 - [ ] Dispatch every target-player ECS operation onto that player's world thread,
   including administrative application commands.
 
 ### Calls and voice
 
-- [ ] Replace independent call maps with one atomic `CallSession` state machine that
+- [x] Replace independent call maps with one atomic `CallSession` state machine that
   reserves both endpoints.
-- [ ] Reject self-calls and overlapping calls; make every transition idempotent.
+- [x] Reject self-calls and overlapping calls; make every transition idempotent.
 - [ ] Keep calls alive when either UI page is dismissed. Track presence separately from an
   optional open-page handle and restore call UI when the page reopens.
 - [ ] Terminate calls on hangup, disconnect, timeout, or framework shutdown.
@@ -197,23 +234,23 @@ contract or persistence model.
 
 ### Build and packaging
 
-- [ ] Convert the build into API and runtime modules.
-- [ ] Publish `esq.phonemod:phonemod-api` for compile-only consumer use.
-- [ ] Include the API classes in the single production runtime JAR.
+- [x] Convert the build into API and runtime modules.
+- [x] Publish `esq.phonemod:phonemod-api` for compile-only consumer use.
+- [x] Include the API classes in the single production runtime JAR.
 - [ ] Remove machine-specific filesystem paths and resolve Hytale as a provided, locally
   installed dependency.
 - [ ] Move all `Phonemod-Assets` content into the runtime module under the correct
   `Common/` and `Server/` roots.
 - [ ] Retire the separate production asset pack. Use runtime resources directly only for
   development-time asset iteration.
-- [ ] Add a deterministic JAR-content assertion for the manifest, API classes, `Common/`,
+- [x] Add a deterministic JAR-content assertion for the manifest, API classes, `Common/`,
   `Server/`, phone item, UI documents, sounds, and language files.
 
 ### v2 API and compatibility bridge
 
-- [ ] Implement `DevicePlatform` and the app, device, presence, messaging, calling,
+- [x] Implement `DevicePlatform` and the app, device, presence, messaging, calling,
   notification, and synchronization service contracts.
-- [ ] Implement `DeviceApp`, `AppDescriptor`, `DeviceAppContext`, `DeviceAction`,
+- [x] Implement `DeviceApp`, `AppDescriptor`, `DeviceAppContext`, `DeviceAction`,
   `DeviceActionResult`, and `AppRegistration`.
 - [ ] Add owner-bound, alias-aware registration and concurrent immutable snapshots.
 - [ ] Add typed shared-event-bus pre/post events.
@@ -224,11 +261,11 @@ contract or persistence model.
 
 ### Durable identity
 
-- [ ] Introduce `DeviceIdentity` with a UUID independent of its human-readable address.
+- [x] Introduce `DeviceIdentity` with a UUID independent of its human-readable address.
 - [ ] Personal devices support explicit ownership transfer. Copied item metadata never
   changes ownership.
 - [ ] Shared devices such as terminals use a shared identity and may omit an address.
-- [ ] Store the authoritative universe-scoped identity registry in a versioned codec
+- [x] Store the authoritative universe-scoped identity registry in a versioned codec
   document.
 - [ ] Derive the address index in memory and save changes atomically through
   `StorageManager`.
@@ -246,7 +283,7 @@ contract or persistence model.
   histories, installs, settings, and app state without overwriting another owner.
 - [ ] Keep stable identity UUID/address during an explicit transfer while leaving the old
   owner's history and application data private. The new owner receives clean defaults.
-- [ ] Add permission-gated `/deviceframework` migration dry-run, status,
+- [x] Add permission-gated `/deviceframework` migration dry-run, status,
   conflict-report, repair, transfer, and release commands.
 - [ ] Make all command operations target-world safe and audit logged.
 
