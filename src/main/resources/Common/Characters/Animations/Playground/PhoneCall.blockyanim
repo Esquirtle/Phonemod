@@ -105,40 +105,40 @@
         {
           "time": 0,
           "delta": {
-            "x": -0.98481,
+            "x": -0.96593,
             "y": 0.0,
             "z": 0.0,
-            "w": 0.17365
+            "w": 0.25882
           },
           "interpolationType": "smooth"
         },
         {
           "time": 30,
           "delta": {
-            "x": -0.98245,
+            "x": -0.96246,
             "y": 0.0,
             "z": 0.0,
-            "w": 0.18652
+            "w": 0.27144
           },
           "interpolationType": "smooth"
         },
         {
           "time": 60,
           "delta": {
-            "x": -0.98481,
+            "x": -0.96593,
             "y": 0.0,
             "z": 0.0,
-            "w": 0.17365
+            "w": 0.25882
           },
           "interpolationType": "smooth"
         },
         {
           "time": 90,
           "delta": {
-            "x": -0.987,
+            "x": -0.96923,
             "y": 0.0,
             "z": 0.0,
-            "w": 0.16074
+            "w": 0.24615
           },
           "interpolationType": "smooth"
         }
