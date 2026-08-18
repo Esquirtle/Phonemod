@@ -11,7 +11,7 @@
    64-character keys, and 1,024-character values. Keep durable domain data in your own
    versioned component/document.
 6. Use `executeOnWorld` for ECS work, `notify` for user feedback, and the platform services
-   for messaging/calls/sync.
+   for messaging/calls.
 7. Register in plugin `setup()`:
 
 ```java
@@ -19,173 +19,145 @@ DevicePlatform.require().apps().registerApp(this, new TasksApp());
 ```
 
 Do not call framework `initialize()`. Cleanup follows the owning plugin automatically.
-The repository's sibling `boilerplate-app` is the compilable canonical example.
 
-## Async Data and Clickable Results
+> **Runnable example:** [`examples/hello-device-app/`](../examples/hello-device-app) is a
+> complete standalone Maven project containing everything below — `pom.xml`, plugin class,
+> `DeviceApp`, `.ui` documents, `.lang` file and manifest. It is verified to compile against
+> `phonemod-api:2.0.0-alpha.1`. The sibling `boilerplate-app` project is a second working
+> example.
 
-Many apps fetch data from an async service (one returning `java.util.concurrent.CompletionStage`).
-The core rule: `build()` must **never** block on the service call. Render synchronously from an
-in-memory per-player cache; repaint after the completion fires by calling
-`AppService.refreshApp(appId, phoneNumber)`. This hops the re-render to the player's world thread
-and is a no-op if the phone is offline or a different app is open.
+## A complete v2 app
 
-### Pattern: Cache + Async fetch + refreshApp
+A `DeviceApp` object is a **singleton shared by every player** — it must hold no per-player
+fields. Per-player values go in `DeviceAppContext.state`, which the framework scopes to the
+device + app.
 
 ```java
-public final class SearchPhoneApp extends StatefulPhoneApp<SearchPhoneApp.State> {
-    public enum State { LIST, DETAIL }
+public final class HelloDeviceApp implements DeviceApp {
 
-    private final Map<String, CachedResults> cache = new ConcurrentHashMap<>();
-    private final SearchService searchService;  // returns CompletionStage<List<Result>>
+    private static final String ACTION_GREET    = "hello_greet";
+    private static final String ACTION_SET_NAME = "hello_set_name";
+    private static final String PARAM_NAME      = "NameText";
+    private static final String STATE_NAME      = "name";
+    private static final String STATE_VIEW      = "view";
+
+    // (id, legacyAliases, localizationKey, iconPath, uiPath, appButtonUiPath,
+    //  capabilities, permissions, supportedDeviceTypes, system, sortOrder)
+    private static final AppDescriptor DESCRIPTOR = new AppDescriptor(
+            "example:hello", Set.of("hello"), "hellodevice.name", null,
+            "Pages/Phone/HelloDeviceApp/Main.ui", "Pages/Phone/HelloDeviceApp/AppButton.ui",
+            Set.of("apps"), Set.of(), Set.of("phone"), false, 50);
+
+    @Override public @Nonnull AppDescriptor descriptor() { return DESCRIPTOR; }
 
     @Override
-    public void build(PhoneAppContext ctx, UICommandBuilder cmd, UIEventBuilder evb) {
-        appendMainUI(ctx, cmd);
-        String phone = ctx.getPhoneNumber();
-        CachedResults cached = cache.computeIfAbsent(phone, k -> new CachedResults());
-        cached.appId = ctx.getAppId();  // capture for async refreshApp calls
+    public void build(@Nonnull DeviceAppContext context, @Nonnull UICommandBuilder commands,
+                      @Nonnull UIEventBuilder events) {
+        boolean detail = "detail".equals(context.state(STATE_VIEW).orElse("main"));
+        commands.set("#MainView.Visible", !detail);
+        commands.set("#DetailView.Visible", detail);
+        commands.set("#TitleLabel.Text", Message.translation("hellodevice.title"));
+        // address() is Optional — a shared device may have no assigned address.
+        commands.set("#AddressLabel.Text", context.address().orElse("(no address)"));
+        commands.set("#GreetingLabel.Text", context.state(STATE_NAME).orElse("(nobody yet)"));
 
-        // If cache is empty and we haven't started loading, kick the fetch
-        if (cached.results == null && !cached.loading) {
-            kickSearch(ctx.getRef(), phone, cached, "default query");
-        }
-
-        if (getState(ctx) == State.LIST) {
-            renderList(cached, cmd, evb);
-        } else {
-            renderDetail(cached, cmd, evb);
-        }
-    }
-
-    private void renderList(CachedResults cached, UICommandBuilder cmd, UIEventBuilder evb) {
-        PhoneUi.safeClear(cmd, "#SearchList");
-        if (cached.results == null) {
-            PhoneUi.setText(cmd, "#SearchStatus.Text",
-                    cached.loading ? "Loading…" : "");
-            return;
-        }
-        for (int i = 0; i < cached.results.size(); i++) {
-            Result r = cached.results.get(i);
-            String row = PhoneUi.appendListItem(cmd, "#SearchList", "Pages/Phone/Components/ResultRow.ui", i);
-            PhoneUi.setText(cmd, PhoneUi.child(row, "#Name.Text"), r.getName());
-            PhoneUi.setText(cmd, PhoneUi.child(row, "#Desc.Text"), r.getDescription());
-            // Bind both button and grid item
-            PhoneUi.bindAction(evb, PhoneUi.child(row, "#ViewButton"), "select_result",
-                    PhoneUi.params("Index", String.valueOf(i)));
-            PhoneUi.bindSlot(evb, PhoneUi.child(row, "#Icon"), "select_result",
-                    PhoneUi.params("Index", String.valueOf(i)));
-        }
-    }
-
-    private void renderDetail(CachedResults cached, UICommandBuilder cmd, UIEventBuilder evb) {
-        Result r = cached.selectedResult;
-        if (r == null) {
-            PhoneUi.setText(cmd, "#DetailTitle.Text", "No selection");
-            PhoneUi.bindAction(evb, "#DetailBack", PhoneEventActions.BACK);
-            return;
-        }
-        PhoneUi.setText(cmd, "#DetailTitle.Text", r.getName());
-        PhoneUi.setText(cmd, "#DetailBody.Text", r.getFullDescription());
-        PhoneUi.bindAction(evb, "#DetailBack", PhoneEventActions.BACK);
+        bind(events, "#GreetButton", EventData.of("Action", ACTION_GREET));
+        // "@" marks a param whose value the client reads from a UI element.
+        bind(events, "#SaveNameButton", EventData.of("Action", ACTION_SET_NAME)
+                .append("@" + PARAM_NAME, "#NameField.Value"));
     }
 
     @Override
-    public boolean handleEvent(PhoneAppContext ctx, PhoneEvent event,
-            UICommandBuilder cmd, UIEventBuilder evb) {
-        String action = event.getAction();
-        String phone = ctx.getPhoneNumber();
-        CachedResults cached = cache.computeIfAbsent(phone, k -> new CachedResults());
-
-        if ("select_result".equals(action)) {
-            String indexStr = event.getParam("Index");
-            if (indexStr != null && cached.results != null) {
-                try {
-                    int idx = Integer.parseInt(indexStr);
-                    if (idx >= 0 && idx < cached.results.size()) {
-                        cached.selectedResult = cached.results.get(idx);
-                        setState(ctx, State.DETAIL);
-                        build(ctx, cmd, evb);
-                        return true;
-                    }
-                } catch (NumberFormatException ignored) { }
+    public @Nonnull DeviceActionResult handle(@Nonnull DeviceAppContext context,
+                                              @Nonnull DeviceAction action) {
+        return switch (action.action()) {
+            case ACTION_GREET -> {
+                context.notify("Hello", "Hello, " + context.state(STATE_NAME).orElse("stranger") + "!");
+                yield DeviceActionResult.HANDLED;
             }
-            return false;
-        }
-
-        if (PhoneEventActions.BACK.equals(action)) {
-            setState(ctx, State.LIST);
-            cached.selectedResult = null;
-            build(ctx, cmd, evb);
-            return true;
-        }
-
-        return false;
+            case ACTION_SET_NAME -> {
+                // DeviceAction already bounds sizes; still validate the domain.
+                String name = action.parameters().getOrDefault(PARAM_NAME, "").trim();
+                if (name.isEmpty() || name.length() > 32) yield DeviceActionResult.REJECTED;
+                context.state(STATE_NAME, name);
+                context.state(STATE_VIEW, "detail");
+                yield DeviceActionResult.RERENDER;   // framework re-runs build()
+            }
+            default -> DeviceActionResult.REJECTED;
+        };
     }
 
-    private void kickSearch(Ref<EntityStore> ref, String phone, CachedResults cached, String query) {
-        cached.loading = true;
-        // Call the async service — this runs off the world thread
-        searchService.search(query).whenComplete((results, err) ->
-            onWorld(ref, () -> {
-                // Back on the player's world thread: update cache and refresh
-                cached.loading = false;
-                cached.results = (err != null || results == null) ? List.of() : results;
-                refresh(cached.appId, phone);
-            })
-        );
-    }
-
-    /** Marshal an off-thread completion back to the world thread. */
-    private static void onWorld(Ref<EntityStore> ref, Runnable work) {
-        if (ref == null) return;
-        ref.getStore().getExternalData().getWorld().execute(() -> {
-            if (ref.isValid()) work.run();
-        });
-    }
-
-    /** Repaints this app if the player has it open. */
-    private static void refresh(String appId, String phone) {
-        DevicePlatform.require().apps().refreshApp(appId, phone);
-    }
-
-    private static final class CachedResults {
-        List<Result> results;
-        boolean loading;
-        Result selectedResult;
-        String appId;
+    private static void bind(UIEventBuilder events, String selector, EventData data) {
+        events.addEventBinding(CustomUIEventBindingType.Activating, selector, data, true);
     }
 }
 ```
 
-### Key points
+Return values from `handle` (`DeviceActionResult.java:3`):
 
-**Capture on the world thread.** Store `appId = ctx.getAppId()` and `phone = ctx.getPhoneNumber()`
-in your per-player cache before the async call, so they're available to the completion callback
-off-thread.
+| Result | Meaning |
+|---|---|
+| `HANDLED` | Consumed; no re-render |
+| `RERENDER` | Consumed; the framework calls `build()` again |
+| `REJECTED` | Not consumed (also the `DeviceApp.handle` default, `DeviceApp.java:14-17`) |
 
-**World-thread hop.** Completions fire on the service's thread pool. Use `onWorld(ref, work)` to
-hop back to the player's world thread before mutating the cache and calling `refreshApp`. The
-player's `World` is the serial execution context for ECS and UI — never `.join()` it.
+Every selector you address must exist in the `.ui` document named by
+`AppDescriptor.uiPath` — the framework mounts that document before `build()` runs. The app
+never clears or appends the shell content area itself.
 
-**Clickable items.** Bind an `ItemGrid` with `PhoneUi.bindSlot(evb, gridSelector, action, params)`.
-The client appends the clicked slot index as `SlotIndex`; read it in `handleEvent` via
-`event.slotIndex()`. Use it to look up the item in your cached list. Slot clicks are mutations
-only by your code's choice — they're fundamentally navigation (no interface lock).
+## v2 apps are synchronous today
 
-### Gotchas
+**`build()` must render from data already in hand.** A v2 `DeviceApp` has no supported way
+to repaint itself after an asynchronous completion, so do not design one around a
+`CompletionStage`.
 
-- **Never block on `CompletionStage.join()`** on the world thread, or the player's tick will stall.
-- **`refreshApp` is best-effort:** if the phone went offline or the player switched to another app,
-  the repaint is a no-op. Your cache remains intact for the next `build()`.
-- **Unbounded service calls:** if the user clicks "search" repeatedly while loading, you'll queue
-  multiple calls. Add a loading guard (e.g., `if (!cached.loading) kickSearch(...)`) to prevent
-  duplicate calls, or debounce via a request queue.
-- **Keep cached data in-memory only.** Component state slots (per `PhoneAppContext.getState()`)
-  are bounded to 32 keys × 64 characters; domain objects belong in a `ConcurrentHashMap`.
+The reason is a concrete gap, not a style preference:
 
-### See also
+- The repaint call is
+  `AppService.refreshApp(String appId, String phoneNumber)`
+  (`phonemod-api/src/main/java/esq/phonemod/api/AppService.java:34`). Its contract names the
+  second argument as `PhoneAppContext.getPhoneNumber()` (`:32`), and the implementation
+  resolves the live page with `PhoneRegistry.getOnlineEntry(phoneNumber)`
+  (`src/main/java/esq/phonemod/platform/RuntimeAppService.java:93-99`).
+- `DeviceAppContext` exposes **no phone number**. Its full surface is `player()`,
+  `identity()`, `address()`, `executeOnWorld`, `state` (×2), `notify` and `sync()`
+  (`phonemod-api/src/main/java/esq/phonemod/api/DeviceAppContext.java:8-17`).
+- `address()` is *not* a substitute. It is `identity().optionalAddress()` (`:11`), so it is
+  an `Optional` that is empty whenever the device identity carries a null address
+  (`DeviceIdentity.java:9,18`), and the identity is resolved by lookup rather than being the
+  raw registry key (`RuntimeDeviceAppContext.java:19-28`). Nothing guarantees it equals the
+  key `refreshApp` needs.
+- `DeviceAppContext.sync()` returns `esq.phonemod.api.SyncService`, which is a two-method
+  stub with no callback and cannot deliver anything to a subscriber
+  (`phonemod-api/src/main/java/esq/phonemod/api/SyncService.java:5-8`). It is **not** an
+  async-refresh mechanism — see [SYNC.md](SYNC.md#the-v2-esqphonemodapisyncservice-stub).
 
-- [V2_API.md](V2_API.md) — `AppService.refreshApp` contract
-- [events.md](events.md) — `PhoneUi.bindSlot` and `PhoneEvent.slotIndex()`
-- [creating-apps.md](creating-apps.md#step-6b-async-data-and-clickable-item-grids) — sync channel alternative
-- [SYNC.md](SYNC.md) — when to prefer sync channels over `refreshApp` (multi-viewer shared state)
+**If you need async data or live shared state today, register a v1 app** via
+`AppService.registerLegacyApp(owner, canonicalId, legacyAliases, PhoneApp<?>)`
+(`AppService.java:14-16`), which is supported throughout 2.x. The v1 `PhoneAppContext` does
+expose `getPhoneNumber()` (`PhoneAppContext.java:81`), which is what both the async-refresh
+pattern and sync channels require.
+
+- Async cache + `refreshApp` pattern (normative):
+  [creating-apps.md § Step 6b](creating-apps.md#step-6b-async-data-and-clickable-item-grids)
+- Multi-viewer shared state: [SYNC.md](SYNC.md)
+
+## Threading
+
+`build()` and `handle()` are called on the player's world thread. The normative rules live
+in [creating-apps.md § Step 6b](creating-apps.md#step-6b-async-data-and-clickable-item-grids);
+the v2-specific points are:
+
+- **ECS access** — never touch the `Store` directly from a context callback. Use
+  `context.executeOnWorld(world -> ...)`, which hops to the owning world thread and
+  re-checks `ref.isValid()` before handing you the `Ref` + `Store`
+  (`RuntimeDeviceAppContext.java:29-35`).
+- **Never block** `build()`/`handle()` on I/O or `CompletionStage.join()` — the player's
+  tick stalls.
+
+## See also
+
+- [V2_API.md](V2_API.md) — full v2 signature reference and the published event package
+- [examples/hello-device-app/](../examples/hello-device-app) — the compiling version of this page
+- [MIGRATION_V1_TO_V2.md](MIGRATION_V1_TO_V2.md) — moving an existing `PhoneApp` across
+- [V2_DEVICE_TUTORIAL.md](V2_DEVICE_TUTORIAL.md) — personal and shared device integration

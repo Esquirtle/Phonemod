@@ -37,7 +37,16 @@ custom image is blank — a confusing "the UI works but images don't" symptom.
 | `DUST_CONTACTS_UI` | `Pages/Phone/DustContacts.ui` |
 | `DUST_CALLS_UI` | `Pages/Phone/DustCalls.ui` |
 | `DUST_SETTINGS_UI` | `Pages/Phone/DustSettings.ui` |
+| `DUST_APPSTORE_UI` | `Pages/Phone/DustAppStore.ui` |
+| `DUST_GROUPCHAT_UI` | `Pages/Phone/DustGroupChat.ui` |
 | `WHATGRAM_BUTTON_UI` / `CONTACTS_BUTTON_UI` / `CALLS_BUTTON_UI` / `SETTINGS_BUTTON_UI` | `Pages/Phone/Components/<App>Button.ui` |
+| `GROUPCHAT_BUTTON_UI` | `Pages/Phone/Components/GroupChatButton.ui` |
+| `APPSTORE_BUTTON_UI` | `Pages/Phone/Components/AppStoreButton.ui` |
+| `GROUPCHAT_BUBBLE_UI` | `Pages/Phone/Components/DustWhatgramBubble.ui` |
+
+`GROUPCHAT_BUBBLE_UI` is the message bubble Group Chat reuses from Whatgram (sender +
+body) — the constant name and the file name deliberately differ
+(`phonemod-api/src/main/java/esq/phonemod/phone/api/PhoneAssetPaths.java:47`).
 
 Component-fragment paths (list rows, chat bubbles, call overlays) live in each
 app's helper class — `Whatgram.ENTRY_UI`, `Whatgram.BUBBLE_UI`,

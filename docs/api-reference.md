@@ -92,6 +92,54 @@ default String[] getSupportedDeviceTypes()
 Returns supported device type IDs, such as `"phone"` or `"tablet"`. An empty
 array supports every device type. Incompatible apps are excluded from catalog
 and home-grid views and rejected if opened through a direct action.
+`@Nonnull`; default `new String[0]` (`PhoneApp.java:153`).
+
+```java
+@Nullable default String getIconPath()
+```
+Optional icon texture path for compact list/store rows (e.g. the App Store), as an
+absolute UI path under `Common/UI/Custom/` — for example `"Pages/Phone/Whatgram.png"`.
+Reference it **without** the `@2x` suffix; the engine adds it. Returns `null` when the app
+has no dedicated icon, in which case consumers fall back to a placeholder tile. Distinct
+from `getAppButtonUI()`, which is the full home-grid button document. Default: `null`
+(`PhoneApp.java:60`).
+
+```java
+default Map<String, String> getThemeableSelectors()
+```
+Themeable selectors this app exposes, as *role → selector*. Roles correspond to keys in a
+theme palette's `Colors` map (see `DeviceThemeAsset`); the framework sets the `Background`
+of each selector to the palette color when a theme is applied. Selectors should name
+elements inside this app's own `getUIPath()` document. Default: empty map
+(`PhoneApp.java:73`). See [theming.md](theming.md).
+
+```java
+@Nullable default String getRequiredPermission()
+```
+Permission node required to install *and* open this app (a plain dot-separated string such
+as `"apps.police.database"`), or `null` when the app is freely accessible. Evaluated by
+`AppCatalogService` at install time and again at every open via `DevicePage`. Default:
+`null` (`PhoneApp.java:122`).
+
+```java
+@Nonnull default String getPermissionVisibility()
+```
+How the app is presented to a player who lacks `getRequiredPermission()`:
+
+- `"locked"` (default) — visible in the App Store with a locked badge; cannot be installed
+  or opened.
+- `"hidden"` — suppressed from every UI surface.
+
+Only consulted when `getRequiredPermission()` is non-null. Default: `"locked"`
+(`PhoneApp.java:139`).
+
+```java
+default boolean isSystemApp()
+```
+`true` marks a system app: force-present on every device at every open and not
+uninstallable by the player. Apps returning `true` must also appear in the device asset's
+`DefaultApps` array. The bundled Whatgram, Contacts, Calls, Settings and AppStore apps
+return `true`. Default: `false` (`PhoneApp.java:167`).
 
 ---
 
@@ -158,9 +206,9 @@ The ID of the app this context was created for (matches `getId()`).
 
 ### Per-player state
 
-All values are `String`. State is namespaced by `deviceId + "|" + appId` inside
-`PhoneAppSessionState`, so apps and separate physical devices cannot read each
-other's state through the context API.
+All values are `String`. State is namespaced by `phoneNumber + "|" + appId` inside
+`PhoneAppSessionState` (`PhoneAppContext.java:103`), so apps and separate phone numbers
+cannot read each other's state through the context API.
 
 ```java
 @Nullable String getState(String key)
@@ -235,6 +283,146 @@ For an `ItemGrid` slot-click event, the clicked slot index; `-1` if the event ca
 
 ---
 
+## PhoneUi
+
+`esq.phonemod.phone.api.PhoneUi` — `final`, all methods `static`, no instance state
+(`PhoneUi.java:46,48`). `@Deprecated(since = "2.0", forRemoval = false)` (`:45`) along with
+the rest of the v1 surface, but it is the most-used helper in every existing app.
+
+These are thin wrappers over `UICommandBuilder` / `UIEventBuilder`; they hide nothing, so
+you can freely mix helper calls with direct builder calls.
+
+### set / append / clear ownership contract
+
+From the class javadoc (`PhoneUi.java:22-43`). Violating it breaks theme re-application,
+because a themed selector can be torn down while a palette still targets it:
+
+1. **The shell content area** (`ctx.getContentSelector()`, e.g. `#AppContent`) **is owned by
+   the framework.** An app clears and re-appends it in exactly one place — `build()`, via
+   `StatefulPhoneApp.appendMainUI` or `PhoneUi.appendMain`. Render helpers must never clear
+   or append it again.
+2. **Switch sub-views inside a single app root, not by swapping roots.** Prefer one root
+   document containing every view's elements; toggle with `setVisible` and refill your own
+   list container. This keeps every `getThemeableSelectors()` target alive in all views.
+3. **An app only clears containers it owns** — its own list/group selectors via `safeClear`.
+   To fill a list: `safeClear` it, then `appendListItem` in a loop.
+4. **A full-screen takeover** (e.g. a device-driven incoming-call overlay) is the only case
+   that replaces the content area outright, via `replace`. Apps should avoid it.
+
+### App entry point
+
+```java
+static void appendMain(PhoneAppContext ctx, UICommandBuilder cmd, PhoneApp<?> app)
+```
+Clears `ctx.getContentSelector()` and appends `app.getUIPath()` into it — the canonical
+first two lines of `build()`. Equivalent to `StatefulPhoneApp.appendMainUI`. (`:62`)
+
+### Action binding
+
+```java
+static void bindAction(UIEventBuilder evb, String selector, String action)
+static void bindAction(UIEventBuilder evb, String selector, String action, EventData extraParams)
+```
+Binds an `Activating` event carrying `Action = action`. The 4-arg overload merges every
+entry of `extraParams` alongside it. Both **lock the interface** while the event is in
+flight. Build the payload with `params`. (`:76`, `:89`)
+
+```java
+static void bindOpenApp(UIEventBuilder evb, String selector, String appId)
+```
+Binds a button to open another app. Equivalent to
+`EventData.of("Action", "open_app").append("App", appId)`. (`:131`)
+
+```java
+static void bindBack(UIEventBuilder evb, String selector)
+static void bindHome(UIEventBuilder evb, String selector)
+```
+Fire the framework `back` / `home` actions (`PhoneEventActions.BACK` / `.HOME`).
+(`:143`, `:150`)
+
+```java
+static void bindSlot(UIEventBuilder evb, String gridSelector, String action)
+static void bindSlot(UIEventBuilder evb, String gridSelector, String action, EventData extraParams)
+```
+Binds an `ItemGrid`'s slot clicks. The clicked index arrives as the `SlotIndex` param — read
+it with `PhoneEvent.slotIndex()`. Unlike `bindAction` these do **not** lock the interface,
+because slot selection is navigation rather than mutation. (`:107`, `:115`)
+
+```java
+static void bindCapturedText  (UIEventBuilder evb, String selector, String action,
+                               String paramName, String inputSelector)
+static void bindCapturedNumber(UIEventBuilder evb, String selector, String action,
+                               String paramName, String inputSelector)
+```
+Fire `action` and capture a client-side input value into `paramName`, using the `@`-prefix
+convention (`EventData.of("Action", action).append("@" + paramName, inputSelector)`).
+`inputSelector` must name an element exposing `.Value`, e.g. `"#MessageInput.Value"`.
+`bindCapturedNumber` is an alias of `bindCapturedText` provided purely for semantic clarity
+— there is **no** numeric parsing or validation. (`:167`, `:182`)
+
+### List and selector composition
+
+```java
+@Nonnull static String appendListItem(UICommandBuilder cmd, String listSelector,
+                                      String uiPath, int index)
+```
+Appends `uiPath` into `listSelector` and returns the indexed row selector for the entry it
+just added — e.g. `"#MyList[2]"`. `index` is the 0-based position you are filling; the
+helper does not track it for you. (`:203`)
+
+```java
+@Nonnull static String rowSelector(String listSelector, int index)   // "#ContactList[3]"
+@Nonnull static String indexed    (String parentSelector, int index) // "#APPHolder[2]"
+@Nonnull static String child      (String parentSelector, String childSelector)
+                                                       // "#ContactList[0] #ContactName"
+```
+Pure string composition. `rowSelector` and `indexed` are identical in behavior (`parent +
+"[" + index + "]"`); the two names exist to signal list-row versus generic-child intent.
+`child` joins with a single space. (`:216`, `:235`, `:226`)
+
+### Text and visibility
+
+```java
+static void setText(UICommandBuilder cmd, String selector, Message message)
+static void setText(UICommandBuilder cmd, String selector, String rawText)
+static void setLocalizedText(UICommandBuilder cmd, String selector, String translationKey)
+static void setVisible(UICommandBuilder cmd, String selector, boolean visible)
+```
+The `Message` overload sets a localized message; the `String` overload sets raw,
+unlocalized text — prefer `setLocalizedText` (which wraps `Message.translation(key)`) for
+anything user-visible. `setVisible` targets `selector + ".Visible"`.
+(`:244`, `:254`, `:263`, `:273`)
+
+### Content replacement and clearing
+
+```java
+static void replace  (UICommandBuilder cmd, String selector, String uiPath)
+static void safeClear(UICommandBuilder cmd, String selector)
+```
+`replace` clears `selector` then appends `uiPath` — reserved for full-screen takeovers per
+the ownership contract. `safeClear` is a plain clear that is safe on an already-empty or
+absent selector. (`:284`, `:295`)
+
+### EventData factories
+
+```java
+@Nonnull static EventData params(String key, String value)
+@Nonnull static EventData params(Map<String, String> values)
+```
+Build a payload for the `bindAction` / `bindSlot` overloads. (`:306`, `:314`)
+
+### Selector validation
+
+```java
+static void ensureRequiredSelectors(String uiPath, Map<String, String> selectors)
+```
+Logs a warning for every entry whose selector value is null or blank. **Does not throw** —
+the page still builds, and a missing selector silently no-ops in the UI. Pass a map of
+logical name → selector, e.g. `Map.of("submit button", "#SubmitBtn")`; `uiPath` is used
+only in the warning text. (`:333`)
+
+---
+
 ## PhoneService
 
 `esq.phonemod.phone.core.PhoneService`
@@ -266,7 +454,7 @@ Returns the app registered under `appId`, or `null` if not found.
 ```
 Returns all registered apps sorted by `getSortOrder()` ascending. Unmodifiable.
 
-> Page creation lives in the device framework: `DeviceService.createDevicePage(session)`
+> Page creation lives in the device framework: `esq.phonemod.device.core.DeviceService.createDevicePage(session)`
 > (a session built from a `DeviceAsset`). `PhoneService` itself only manages apps.
 
 ---

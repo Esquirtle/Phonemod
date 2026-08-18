@@ -1,0 +1,14 @@
+{
+  "Group": "esq.phonemod.examples",
+  "Name": "HelloDeviceApp",
+  "Version": "1.0.0",
+  "Description": "Minimal runnable Phonemod v2 DeviceApp example.",
+  "Authors": [{"Name": "phonemod"}],
+  "Main": "esq.phonemod.examples.hello.HelloDeviceAppPlugin",
+  "LoadOrder": "POSTWORLD",
+  "ServerVersion": ">=0.5.2 <0.6.0",
+  "IncludesAssetPack": true,
+  "Dependencies": {
+    "esq.phonemod:Phonemod": ">=2.0.0-alpha.1"
+  }
+}

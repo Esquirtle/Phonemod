@@ -1,0 +1,28 @@
+// Home-grid icon button (AppDescriptor.appButtonUiPath).
+//
+// Contract enforced by the app menu:
+//   - root element named #APPBUTTONENTRY
+//   - a TextButton named #APPBUTTON (the icon surface)
+//   - a Label named #APPNAME (the framework sets its text at runtime)
+
+Group #APPBUTTONENTRY {
+  LayoutMode: Top;
+  FlexWeight: 1;
+  Padding: (Horizontal: 3, Vertical: 3);
+  Anchor: (Width: 84, Height: 100);
+
+  TextButton #APPBUTTON {
+    Anchor: (Width: 64, Height: 64);
+    Style: (
+      Default: (Background: #4a90d9),
+      Hovered: (Background: #357ab8),
+      Pressed: (Background: #2a5f8f)
+    );
+  }
+
+  Label #APPNAME {
+    Anchor: (Top: 8, Width: 84, Height: 16);
+    Text: "Hello";
+    Style: (FontSize: 12, Alignment: Center, RenderBold: true);
+  }
+}

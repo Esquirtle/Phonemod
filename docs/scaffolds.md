@@ -1,4 +1,9 @@
-# Scaffolds & Checklists
+# Scaffolds & Checklists (legacy v1)
+
+New apps should follow [V2_APP_TUTORIAL.md](V2_APP_TUTORIAL.md), and
+[`examples/hello-device-app/`](../examples/hello-device-app) is a complete runnable v2
+project. The scaffolds below target the deprecated v1 `PhoneApp` surface, which remains
+supported through 2.x.
 
 Copy-paste starting points for new apps and devices, plus quick validation
 checklists. For the full explanations see [creating-apps.md](creating-apps.md).

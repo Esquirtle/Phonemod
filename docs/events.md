@@ -17,8 +17,13 @@ event.getAction()               // the action string (e.g. "open_chat")
 event.getAppId()                // app field from event data (may be blank for generic actions)
 event.getParams()               // unmodifiable Map<String, String>
 event.getParam("key")           // @Nullable — always check for null
-event.getParam("key", "default") // @Nonnull — safe overload
+event.getParam("key", "default") // no annotation; returns defaultValue when the key is absent
 ```
+
+> `getParam(key, defaultValue)` carries **no** `@Nonnull` annotation
+> (`phonemod-api/src/main/java/esq/phonemod/phone/api/PhoneEvent.java:46`). It is
+> `params.getOrDefault(key, defaultValue)`, so it returns `null` if you pass a `null`
+> default. It is only as non-null as the default you supply.
 
 ## Phone-level vs app-level actions
 
@@ -209,11 +214,14 @@ Listeners that mutate world or ECS state must dispatch to the appropriate world
 thread. `unsubscribeAll(type)` removes every subscriber for that type and is
 intended only for framework-wide shutdown.
 
-Current emission contract:
+Current emission contract. These are the **runtime-internal** `esq.phonemod.device.events`
+types delivered through `PhoneEvents`, not the published `esq.phonemod.api.event` types
+documented in [V2_API.md](V2_API.md#published-events--esqphonemodapievent) — note that
+`DeviceOpenEvent` exists in both packages and they are unrelated classes.
 
 | Event | Emitted when |
 |-------|--------------|
-| `DeviceOpenEvent` / `DeviceCloseEvent` | Device page opens or is dismissed |
+| `DeviceOpenEvent` / `DeviceCloseEvent` (`esq.phonemod.device.events`) | Device page opens or is dismissed |
 | `DeviceAppOpenEvent` / `DeviceAppCloseEvent` | App opens or closes |
 | `DeviceSettingsChangedEvent` | Settings app persists a change |
 | `PhoneCallStartedEvent` | Call registry accepts an outgoing attempt |

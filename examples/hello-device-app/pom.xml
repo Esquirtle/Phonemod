@@ -1,0 +1,59 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      Standalone example — deliberately NOT a module of the Phonemod reactor
+      (../../pom.xml), so it can never break the framework build. Build it on
+      its own with `mvn -f Phonemod/examples/hello-device-app/pom.xml package`.
+    -->
+    <groupId>esq.phonemod.examples</groupId>
+    <artifactId>hello-device-app</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!-- plugins-srcs/HytaleServer.jar, three levels up from this directory. -->
+        <hytale.install-dir>${project.basedir}/../../../HytaleServer.jar</hytale.install-dir>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.1</version>
+                <configuration>
+                    <source>25</source>
+                    <target>25</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <!-- Hytale server JAR — provided by the server at runtime, compile-only here. -->
+        <dependency>
+            <groupId>com.hytale</groupId>
+            <artifactId>hytale-server</artifactId>
+            <version>LOCAL</version>
+            <scope>system</scope>
+            <systemPath>${hytale.install-dir}</systemPath>
+        </dependency>
+
+        <!--
+          The published consumer API. `provided`: the Phonemod runtime plugin
+          ships these classes, so they must NOT be bundled into this jar.
+          Install it first with:
+            mvn -f Phonemod/pom.xml install -DskipTests
+        -->
+        <dependency>
+            <groupId>esq.phonemod</groupId>
+            <artifactId>phonemod-api</artifactId>
+            <version>2.0.0-alpha.1</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

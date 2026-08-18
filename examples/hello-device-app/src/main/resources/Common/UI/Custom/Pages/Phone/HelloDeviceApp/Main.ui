@@ -1,0 +1,105 @@
+// Root document for the Hello Device App example.
+//
+// Phonemod mounts this file (AppDescriptor.uiPath) into the device shell's
+// content area before calling DeviceApp.build(). The app itself never appends
+// or clears the content area.
+//
+// Every selector the Java code addresses must exist here:
+//   #TitleLabel #MainView #AddressLabel #NameField #SaveNameButton #GreetButton
+//   #DetailView #GreetingLabel #BackButton
+//
+// NOTE: the client .ui parser only accepts `Alignment: Center`. `Right`/`Left`
+// crash the parse for the whole asset pack.
+
+Group {
+  Anchor: (Width: 360, Height: 570);
+  LayoutMode: Top;
+  Background: #f5f5f5;
+
+  Group #Topbar {
+    Anchor: (Width: 360, Height: 30);
+    Background: #4a90d9;
+    LayoutMode: CenterMiddle;
+
+    Label #TitleLabel {
+      Text: "Hello";
+      Style: (FontSize: 14, RenderBold: true, TextColor: #ffffff, Alignment: Center);
+    }
+  }
+
+  // ── Main view ──────────────────────────────────────────────────────────────
+  Group #MainView {
+    Anchor: (Width: 360, Height: 540);
+    LayoutMode: Top;
+    Padding: (Full: 16);
+
+    Label {
+      Text: "This device's address";
+      Style: (FontSize: 12, TextColor: #666666);
+    }
+
+    Label #AddressLabel {
+      Text: "-";
+      Anchor: (Bottom: 12);
+      Style: (FontSize: 16, RenderBold: true, TextColor: #333333);
+    }
+
+    Label {
+      Text: "Your name";
+      Style: (FontSize: 12, TextColor: #666666);
+    }
+
+    TextField #NameField {
+      Anchor: (Height: 38, Bottom: 12);
+      PlaceholderText: "e.g. Big Tony";
+    }
+
+    TextButton #SaveNameButton {
+      Anchor: (Width: 200, Height: 40, Bottom: 8);
+      Text: "Save name";
+      Style: (
+        Default: (Background: #4a90d9, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff)),
+        Hovered: (Background: #357ab8, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff)),
+        Pressed: (Background: #2a5f8f, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff))
+      );
+    }
+
+    TextButton #GreetButton {
+      Anchor: (Width: 200, Height: 40);
+      Text: "Greet me";
+      Style: (
+        Default: (Background: #7ab648, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff)),
+        Hovered: (Background: #669a3c, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff)),
+        Pressed: (Background: #4f7a2d, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff))
+      );
+    }
+  }
+
+  // ── Detail view ────────────────────────────────────────────────────────────
+  Group #DetailView {
+    Anchor: (Width: 360, Height: 540);
+    LayoutMode: Top;
+    Padding: (Full: 16);
+
+    Label {
+      Text: "Saved name";
+      Style: (FontSize: 12, TextColor: #666666);
+    }
+
+    Label #GreetingLabel {
+      Text: "-";
+      Anchor: (Bottom: 16);
+      Style: (FontSize: 18, RenderBold: true, TextColor: #333333, Alignment: Center);
+    }
+
+    TextButton #BackButton {
+      Anchor: (Width: 200, Height: 40);
+      Text: "Back";
+      Style: (
+        Default: (Background: #999999, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff)),
+        Hovered: (Background: #7d7d7d, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff)),
+        Pressed: (Background: #616161, LabelStyle: (FontSize: 13, Alignment: Center, TextColor: #ffffff))
+      );
+    }
+  }
+}

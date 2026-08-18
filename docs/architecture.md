@@ -20,7 +20,15 @@ shell + routing live in the `device` packages; the app contract lives in
 | `PhoneAppContext` | `phone.api` | Per-player session context passed to every app method: ECS access, identity, scoped state, and the shell content selector. |
 | `PhoneEvent` / `PhoneEventActions` | `phone.api` | Normalized event payload + action-name constants. |
 | `PhoneUi` / `PhoneAssetPaths` | `phone.api` | UI-builder helpers + asset-path constants. |
-| `PhoneAppSessionState` | `phone.components` | ECS component on the player: `Map<deviceId\|appId, Map<key,value>>` — isolated per device + app. |
+| `PhoneAppSessionState` | `phone.components` | ECS component on the player: `Map<phoneNumber\|appId, Map<key,value>>` — isolated per phone number + app. The session key is built in `PhoneAppContext.java:103`. |
+
+> **Name collisions with the published API.** Every class named on this page is a
+> **runtime-internal** one — including `DeviceService` (`esq.phonemod.device.core`) and the
+> `DeviceOpenEvent` listed in [events.md](events.md) (`esq.phonemod.device.events`).
+> The `phonemod-api` module publishes unrelated types with the same simple names
+> (`esq.phonemod.api.DeviceService`, `esq.phonemod.api.event.DeviceOpenEvent`), and those are
+> the only ones a consumer plugin can see. The runtime writes the API ones fully qualified to
+> keep them apart (`device/ui/DevicePage.java:105`). See [V2_API.md](V2_API.md).
 
 ## Relationship diagram
 

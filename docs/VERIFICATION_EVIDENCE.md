@@ -1,17 +1,27 @@
 # 2.0.0-alpha.1 verification evidence
 
-Verified through 2026-08-15 against the workspace Hytale server and asset tree with JDK 25.
+Verified through **2026-08-18** against the workspace Hytale server and asset tree with
+JDK 25. (Build, test and consumer-compile sections were re-verified on 2026-08-18; the
+hytest deployment and asset-validation sections below still date from 2026-08-14/15 and
+are unchanged.)
 
 ## Automated build and tests
 
-The Maven reactor was run in `maven:3.9-eclipse-temurin-25`:
+The Maven reactor was run in `maven:3.9-eclipse-temurin-25`
+(`mvn -B -f Phonemod/pom.xml test`, exit code 0) on 2026-08-18:
 
 ```text
-Compiling 37 API source files
-Compiling 138 runtime source files
-Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
+Building Phonemod Public API 2.0.0-alpha.1
+Compiling 138 source files with javac [debug target 25] to target/classes
+Compiling 13 source files with javac [debug target 25] to target/test-classes
+Tests run: 37, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
+
+The module split is 37 API source files (`phonemod-api`) and 138 runtime source files; the
+API module emitted no `Compiling` line in this run because its outputs were already up to
+date. The 37 tests are 13 JUnit classes of plain `@Test` methods (no parameterized or
+repeated tests), all under the runtime module.
 
 Covered suites include public API contracts, identity claims/transfers/shared identities,
 idempotent component migration, UI payload validation, scalar BSON event decoding, rate
@@ -37,6 +47,22 @@ compile-only API dependency:
 | Signal Sweep | PASS |
 | SocialCore | PASS |
 | Trading App | PASS |
+| Tuiter App | PASS |
+| AuctionHouse Phone | PASS |
+| Hello Device App (bundled example) | PASS |
+
+Tuiter App (`tuiter-app`) and AuctionHouse Phone (`auctionhouse-phone`) were verified on
+2026-08-18 with `mvn -B -f <consumer>/pom.xml package -DskipTests`; both returned exit
+code 0 with `BUILD SUCCESS`. The bundled example
+[`examples/hello-device-app`](../examples/hello-device-app) was verified the same way and
+is the only consumer living inside this repository.
+
+> Every one of these builds emits a non-fatal
+> `'dependencies.dependency.systemPath' ... must specify an absolute path` model-validation
+> warning, originating from the installed `phonemod-api-2.0.0-alpha.1.pom`, which carries a
+> relative `systemPath` for the Hytale server jar. Maven prints it at `[ERROR]` level but
+> still reports `BUILD SUCCESS` — judge these builds by exit code, not by grepping for
+> `ERROR`.
 
 This is compile evidence, not the runtime-combination or in-game smoke evidence required
 by the RC gate.

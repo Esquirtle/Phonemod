@@ -184,21 +184,45 @@ When you use `StatefulPhoneApp`, the `__state__` key is managed automatically by
 
 ## Step 6b: Async data and clickable item grids
 
+> **This section is the normative async + threading guidance for apps.** Other pages link
+> here rather than restating it. Note that the pattern needs `ctx.getPhoneNumber()`, so it
+> is available only to v1 `PhoneApp`s — see
+> [V2_APP_TUTORIAL.md](V2_APP_TUTORIAL.md#v2-apps-are-synchronous-today) for why a v2
+> `DeviceApp` cannot do this yet.
+
+### The three thread rules
+
+| What you touch | Which thread | Why |
+|---|---|---|
+| The ECS `Store` / `Ref` (`ctx.getStore()`, `ctx.getState`, `ctx.setState`, components) | **World thread only** | The Store hard-throws off-thread. Hop with `world.execute(...)`, or in v2 use `DeviceAppContext.executeOnWorld`. |
+| `AppService.refreshApp(appId, phoneNumber)` | **Any thread** | It hops internally: `RuntimeAppService` resolves the online phone and calls `entry.world().execute(...)` (`src/main/java/esq/phonemod/platform/RuntimeAppService.java:93-99`, contract at `AppService.java:20-22`). |
+| A plain in-memory cache (`ConcurrentHashMap`) | **Any thread** | It is your own object, not engine state. |
+
+So an async completion callback may write to your cache and call `refreshApp` directly —
+**no manual world hop is required**, and adding one buys nothing. What it must *not* do is
+touch the `Store` (including `ctx.getState` / `ctx.setState`) off-thread.
+
+### Pattern: capture → fetch → cache → refresh
+
 `build()` runs on the world thread and must render synchronously — **never block it** on a
-service call. If your data source is async (returns `CompletionStage`), keep the results in an
-in-memory per-player cache, render from the cache, and repaint when new data arrives with
-`AppService.refreshApp` (which hops to the player's world thread for you):
+service call. Keep results in an in-memory per-player cache, render from the cache, and
+repaint when new data arrives:
 
 ```java
-// capture stable ids while on the world thread
+// capture stable ids while on the world thread — the callback has no ctx
 String appId = ctx.getAppId();
 String phone = ctx.getPhoneNumber();
 myService.fetch(query).whenComplete((result, err) -> {
-    cache.put(phone, result);                                   // off-thread: just store
+    // off-thread. A plain map write is safe here; ctx/Store access would NOT be.
+    cache.put(phone, err != null ? List.of() : result);
     DevicePlatform.require().apps().refreshApp(appId, phone);   // any thread; framework repaints
 });
 // build() then renders cache.get(phone) synchronously
 ```
+
+Guard against duplicate in-flight calls (a `loading` flag per player), and remember
+`refreshApp` is best-effort: if the phone went offline or the player switched apps, the
+repaint is a no-op and your cache simply serves the next `build()`.
 
 To make an `ItemGrid` clickable, bind the slots and read the clicked index:
 
@@ -211,8 +235,9 @@ if ("select_item".equals(event.getAction())) {
 }
 ```
 
-See `V2_API.md` (`refreshApp`) and `events.md` (slot clicks); prefer `refreshApp` over a sync
-channel used only as a refresh signal (`SYNC.md`).
+See [V2_API.md](V2_API.md) (`refreshApp`), [events.md](events.md) (slot clicks) and
+[THREADING.md](THREADING.md). Prefer `refreshApp` over a sync channel used only as a
+refresh signal — sync channels are for genuinely shared multi-viewer state ([SYNC.md](SYNC.md)).
 
 ## Step 7: Handle incoming message/call callbacks if needed
 
