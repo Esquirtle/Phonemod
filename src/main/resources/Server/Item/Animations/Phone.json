@@ -277,14 +277,14 @@
     "UsePhone": {
       "ThirdPerson": "Characters/Animations/Playground/UsePhone.blockyanim",
       "ThirdPersonMoving": "Characters/Animations/Playground/UsePhone.blockyanim",
-      "FirstPerson": "Characters/Animations/Playground/UsePhone.blockyanim",
+      "FirstPerson": "Characters/Animations/Playground/UsePhone_FPS.blockyanim",
       "Speed": 1.0,
       "Looping": true
     },
     "PhoneCall": {
       "ThirdPerson": "Characters/Animations/Playground/PhoneCall.blockyanim",
       "ThirdPersonMoving": "Characters/Animations/Playground/PhoneCall.blockyanim",
-      "FirstPerson": "Characters/Animations/Playground/PhoneCall.blockyanim",
+      "FirstPerson": "Characters/Animations/Playground/PhoneCall_FPS.blockyanim",
       "Speed": 1.0,
       "Looping": true
     }
