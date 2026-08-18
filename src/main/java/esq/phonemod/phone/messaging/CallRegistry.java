@@ -20,6 +20,7 @@ import esq.phonemod.device.events.PhoneCallEndedEvent;
 import esq.phonemod.device.events.PhoneCallMissedEvent;
 import esq.phonemod.device.events.PhoneCallStartedEvent;
 import esq.phonemod.device.events.PhoneEvents;
+import esq.phonemod.phone.animation.PhoneAnimationController;
 import esq.phonemod.phone.components.CallHistoryComponent;
 import esq.phonemod.phone.components.CallRecord;
 import esq.phonemod.security.TokenBucket;
@@ -221,6 +222,9 @@ public final class CallRegistry {
                         CallTransitionEvent.Transition.ANSWERED));
         notifyPage(session.caller(), page -> page.onCallAnswered(session.callee(), session.callee()));
         notifyPage(session.callee(), page -> page.onCallAnswered(session.caller(), session.caller()));
+        // ACTIVE on both endpoints — raise the phone to the ear at each end.
+        PhoneAnimationController.refresh(session.caller());
+        PhoneAnimationController.refresh(session.callee());
         return true;
     }
 
@@ -266,6 +270,10 @@ public final class CallRegistry {
         boolean missed = prior == CallSession.State.RINGING;
         persistAndClose(session.caller(), session.callee(), session.calleeName(), timestamp, true, missed);
         persistAndClose(session.callee(), session.caller(), session.caller(), timestamp, false, missed);
+        // ENDED on both endpoints. The session is already out of BY_ENDPOINT above, so the
+        // controller sees no call and drops back to UsePhone (UI still open) or to nothing.
+        PhoneAnimationController.refresh(session.caller());
+        PhoneAnimationController.refresh(session.callee());
         if (missed) PhoneEvents.post(new PhoneCallMissedEvent(session.callee(), session.caller()));
         else {
             PhoneEvents.post(new PhoneCallEndedEvent(session.caller(), session.callee()));

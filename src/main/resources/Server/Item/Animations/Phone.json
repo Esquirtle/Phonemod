@@ -278,7 +278,15 @@
       "ThirdPerson": "Characters/Animations/Playground/UsePhone.blockyanim",
       "ThirdPersonMoving": "Characters/Animations/Playground/UsePhone.blockyanim",
       "FirstPerson": "Characters/Animations/Playground/UsePhone.blockyanim",
-      "Speed": 0.6
+      "Speed": 1.0,
+      "Looping": true
+    },
+    "PhoneCall": {
+      "ThirdPerson": "Characters/Animations/Playground/PhoneCall.blockyanim",
+      "ThirdPersonMoving": "Characters/Animations/Playground/PhoneCall.blockyanim",
+      "FirstPerson": "Characters/Animations/Playground/PhoneCall.blockyanim",
+      "Speed": 1.0,
+      "Looping": true
     }
   },
   "Camera": {

@@ -15,6 +15,7 @@ import esq.phonemod.device.events.PhoneNotifications;
 import esq.phonemod.device.events.PhoneEvents;
 import esq.phonemod.device.events.PhoneMessageReceivedEvent;
 import esq.phonemod.device.events.PhoneMessageSentEvent;
+import esq.phonemod.phone.animation.PhoneAnimationController;
 import esq.phonemod.phone.components.ConversationHistoryComponent;
 import esq.phonemod.PhoneMod;
 import esq.phonemod.config.PhonemodConfig;
@@ -94,6 +95,10 @@ public final class PhoneRegistry {
         updatePreferences(phoneNumber, settings != null ? settings.get(phoneNumber) : null);
         LOGGER.atFine().log("[PhoneRegistry] Registered phone %s", phoneNumber);
 
+        // Raise the phone to the player's hand now that the UI counts as open. Must follow the
+        // online.put above, since the controller derives the pose from this map.
+        PhoneAnimationController.refresh(phoneNumber);
+
         // Drain any messages that arrived while this number was offline into the
         // recipient's persistent conversation history, so they appear in the chat
         // thread (not just the conversation list) the next time the phone opens.
@@ -131,6 +136,10 @@ public final class PhoneRegistry {
             }
             return e;
         });
+        // Lower the phone — unless a call is still up, in which case the controller keeps the
+        // on-call pose. Deliberately outside the computeIfPresent body: that lambda must stay
+        // free of side effects, and this is a no-op when the page identity guard declined.
+        PhoneAnimationController.refresh(phoneNumber);
     }
 
     /**

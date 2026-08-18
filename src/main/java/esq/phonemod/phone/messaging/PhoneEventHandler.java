@@ -5,6 +5,7 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import esq.phonemod.phone.animation.PhoneAnimationController;
 import esq.phonemod.phone.sync.SyncService;
 import esq.phonemod.phone.sync.room.RoomService;
 
@@ -42,5 +43,8 @@ public final class PhoneEventHandler implements Consumer<PlayerDisconnectEvent> 
             RoomService.leaveAll(phoneNumber);
         }
         PhoneRegistry.unregisterByRef(ref);
+        // The entity is going away, so there is nothing to send a stop packet to — just drop
+        // the remembered pose so the tracking map does not grow across reconnects.
+        PhoneAnimationController.forget(playerRef.getUuid());
     }
 }
