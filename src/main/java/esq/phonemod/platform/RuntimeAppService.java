@@ -91,6 +91,7 @@ public final class RuntimeAppService implements AppService {
     }
 
     @Override public void refreshApp(@Nonnull String appId, @Nonnull String phoneNumber) {
+        if (appId == null || phoneNumber == null) return;
         // Same push path the sync layer uses (SyncService.broadcast): resolve the online
         // phone, hop to its world thread, and re-render the app if it is the one open.
         PhoneRegistry.OnlineEntry entry = PhoneRegistry.getOnlineEntry(phoneNumber);

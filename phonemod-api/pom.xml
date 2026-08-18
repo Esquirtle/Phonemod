@@ -15,6 +15,19 @@
     <properties>
         <hytale.install-dir>${project.basedir}/../../HytaleServer.jar</hytale.install-dir>
     </properties>
+    <dependencies>
+        <!-- Mark optional so downstream consumers of phonemod-api do not inherit this
+             system-scoped dependency. Consumers declare their own hytale-server dep
+             with a correct local systemPath. -->
+        <dependency>
+            <groupId>com.hytale</groupId>
+            <artifactId>hytale-server</artifactId>
+            <version>LOCAL</version>
+            <scope>system</scope>
+            <systemPath>${hytale.install-dir}</systemPath>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
     <build>
         <plugins>
             <plugin>

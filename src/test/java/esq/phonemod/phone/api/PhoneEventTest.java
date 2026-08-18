@@ -10,7 +10,7 @@ class PhoneEventTest {
 
     @Test
     void slotIndexParsesPresentValue() {
-        PhoneEvent event = new PhoneEvent("selectListing", "auctionhouse", Map.of("SlotIndex", "7"));
+        PhoneEvent event = new PhoneEvent("select_listing", "auctionhouse", Map.of("SlotIndex", "7"));
         assertEquals(7, event.slotIndex());
     }
 

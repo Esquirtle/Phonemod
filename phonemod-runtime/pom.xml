@@ -21,6 +21,16 @@
             <resource>
                 <directory>${project.basedir}/../src/main/resources</directory>
                 <filtering>false</filtering>
+                <excludes>
+                    <exclude>manifest.json</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/../src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>manifest.json</include>
+                </includes>
             </resource>
         </resources>
         <plugins>

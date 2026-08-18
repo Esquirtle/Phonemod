@@ -1,6 +1,5 @@
 package esq.phonemod.platform;
 
-import com.hypixel.hytale.server.core.entity.entities.Player;
 import esq.phonemod.api.DeviceAppContext;
 import esq.phonemod.api.DeviceIdentity;
 import esq.phonemod.api.SyncService;
@@ -28,9 +27,10 @@ final class RuntimeDeviceAppContext implements DeviceAppContext {
                 legacy.getPhoneNumber(), false));
     }
     public void executeOnWorld(@Nonnull Consumer<WorldAccess> work) {
-        Player player = legacy.getStore().getComponent(legacy.getRef(), Player.getComponentType());
-        if (player != null) player.getWorld().execute(() -> {
-            if (legacy.getRef().isValid()) work.accept(new WorldAccess(legacy.getRef(), legacy.getStore()));
+        var ref = legacy.getRef(); // plain field read — safe off-thread
+        if (ref == null) return;
+        ref.getStore().getExternalData().getWorld().execute(() -> {
+            if (ref.isValid()) work.accept(new WorldAccess(ref, legacy.getStore()));
         });
     }
     public Optional<String> state(String key) { return Optional.ofNullable(legacy.getState(key)); }
