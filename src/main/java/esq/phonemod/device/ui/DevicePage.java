@@ -47,6 +47,7 @@ import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.CallRegistry;
 import esq.phonemod.phone.messaging.PhoneRegistry;
 import esq.phonemod.PhoneMod;
+import esq.phonemod.security.AppOpenAuthorizer;
 import esq.phonemod.security.UiEventDecoder;
 import esq.phonemod.security.UiEventValidator;
 import esq.phonemod.operations.OperationalMetrics;
@@ -350,37 +351,49 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             return null;
         }
         PhoneApp<?> app = PhoneService.get().getApp(appId);
-        if (app == null) {
-            LOGGER.atWarning().log("[DevicePage] Unknown app: %s", appId);
-            return null;
-        }
-        if (!supportsCurrentDevice(app)) {
-            LOGGER.atWarning().log("[DevicePage] App %s does not support device type %s",
-                    appId, session.getShell().getDeviceType());
-            return null;
-        }
-        if (!isAuthorizedSession(ref, store)) {
-            LOGGER.atWarning().log("[DevicePage] Unauthorized app open device=%s app=%s",
-                    session.getDeviceId(), appId);
-            return null;
-        }
-        if (!AppInstallService.get().isInstalled(ref, store, session.getDeviceId(), appId)) {
-            LOGGER.atWarning().log("[DevicePage] App is not installed device=%s app=%s",
-                    session.getDeviceId(), appId);
-            return null;
-        }
+        boolean appKnown = app != null;
+        UUID actorUuid = resolvePlayerUuid(ref, store);
+        Set<String> supportedDeviceTypes =
+                appKnown ? Set.of(app.getSupportedDeviceTypes()) : Set.of();
+        String deviceType = session.getShell().getDeviceType();
+        boolean sessionOwnedByActor = isAuthorizedSession(ref, store);
+        boolean installed = appKnown
+                && AppInstallService.get().isInstalled(ref, store, session.getDeviceId(), appId);
+        Set<String> requiredPermissions = appKnown ? app.getRequiredPermissions() : Set.of();
+        java.util.function.Predicate<String> hasPermission =
+                node -> actorUuid != null && PermissionsModule.get().hasPermission(actorUuid, node);
 
-        // Decision C: re-verify permission at launch time (one check per open).
-        String requiredNode = app.getRequiredPermission();
-        if (requiredNode != null) {
-            UUID playerUuid = resolvePlayerUuid(ref, store);
-            if (playerUuid == null || !PermissionsModule.get().hasPermission(playerUuid, requiredNode)) {
+        AppOpenAuthorizer.Decision decision = AppOpenAuthorizer.authorize(
+                appKnown, supportedDeviceTypes, deviceType, sessionOwnedByActor,
+                installed, requiredPermissions, hasPermission);
+        switch (decision) {
+            case ALLOW:
+                break;
+            case MISSING_PERMISSION: {
+                // Decision C: re-verify permission at launch time (one check per open).
                 PlayerRef pr = store.getComponent(ref, PlayerRef.getComponentType());
                 if (pr != null) {
                     pr.sendMessage(Message.translation("phonemod.appstore.launch.denied"));
                 }
                 return null;
             }
+            case UNKNOWN_APP:
+                LOGGER.atWarning().log("[DevicePage] Unknown app: %s", appId);
+                return null;
+            case INCOMPATIBLE_DEVICE:
+                LOGGER.atWarning().log("[DevicePage] App %s does not support device type %s",
+                        appId, session.getShell().getDeviceType());
+                return null;
+            case NOT_OWNER:
+                LOGGER.atWarning().log("[DevicePage] Unauthorized app open device=%s app=%s",
+                        session.getDeviceId(), appId);
+                return null;
+            case NOT_INSTALLED:
+                LOGGER.atWarning().log("[DevicePage] App is not installed device=%s app=%s",
+                        session.getDeviceId(), appId);
+                return null;
+            default:
+                return null;
         }
 
         UUID openingPlayer = resolvePlayerUuid(ref, store);

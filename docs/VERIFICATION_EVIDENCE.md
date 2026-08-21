@@ -1,9 +1,67 @@
-# 2.0.0-alpha.1 verification evidence
+# 2.0.0-alpha verification evidence (current: alpha.12)
 
 Verified through **2026-08-18** against the workspace Hytale server and asset tree with
 JDK 25. (Build, test and consumer-compile sections were re-verified on 2026-08-18; the
 hytest deployment and asset-validation sections below still date from 2026-08-14/15 and
 are unchanged.)
+
+## 1.1 app-open authorization — 2026-08-21 (implementer workflow)
+
+Closed the two 1.1 server-authoritative app-open plan items + their authorization test.
+Five edits on `feature/v2-refactor` (uncommitted at time of writing):
+
+- **`security/AppOpenAuthorizer`** (new) — a pure, dependency-free decision function
+  (`ALLOW / UNKNOWN_APP / INCOMPATIBLE_DEVICE / NOT_OWNER / NOT_INSTALLED /
+  MISSING_PERMISSION`), fail-closed, first-failure-wins, order matching the pre-refactor
+  inline checks. Empty supported-device set = any device; **all** required permissions must
+  be granted.
+- **`DevicePage.openApp`** now computes the seven inputs and delegates to the authorizer;
+  the `ALLOW` branch falls through to the unchanged build/dispatch path. Behavior-parity
+  reviewed against the pre-refactor diff: no session state mutated on any reject path;
+  `currentApp`/`AppOpenEvent.Post` only on `ALLOW`; `phonemod.appstore.launch.denied` only
+  on `MISSING_PERMISSION`.
+- **`PhoneApp.getRequiredPermissions()`** (additive default) + **`DeviceAppAdapter`**
+  override returning the full `descriptor.permissions()` set — fixes a real bug where a v2
+  app declaring multiple permissions only enforced the first (`.stream().findFirst()`).
+- **`AppOpenAuthorizerTest`** (new) — 10 JUnit cases: hidden-UI-grants-nothing, hidden-UI
+  legit holder, forged app id, incompatible device, missing ownership, missing permission,
+  revoked permission, multi-permission (partial vs full grant), happy path, and
+  first-failure-wins order.
+
+Verified in `maven:3.9-eclipse-temurin-25` (JDK 25), `mvn -B test`, exit 0: **`Tests run:
+47, Failures: 0, Errors: 0`** (up from 37). The packaged runtime jar booted alone in a
+fresh isolated universe and reached `Enabled plugin esq.phonemod:Phonemod` → `Universe
+ready!` → `Hytale Server Booted!` with no plugin-attributable exception (regression check
+that the `openApp` refactor didn't break registration).
+
+**Still open for these items:** the 1.1 exit-gate **multiplayer forged-action / audio-leak
+acceptance pass** (in-game, can't be done headless), and the world-thread-dispatch
+**runtime-proof** concurrency test (item is code-complete by cited audit — all 10
+target-player ECS ops already hop — but not yet proven by a deterministic test).
+
+## Re-verification — 2026-08-21 (alpha.12)
+
+The version advanced `alpha.1 → alpha.12` since the sections below were written. **Every
+commit in that range was phone model/animation iteration** (held chest-hold pose, on-call
+ear pose, slimmed upright 30u model, split 1P/3P `_FPS` animation variants) plus the
+matching pack-`Version` bumps to bust the client asset cache — see
+[[phonemod-anim-wiring]]. **No professionalization-plan gate advanced**; the checkbox
+state in `PROFESSIONALIZATION_PLAN.md` is unchanged.
+
+Re-verified today in `maven:3.9-eclipse-temurin-25` (JDK 25), `mvn -B test`, exit 0:
+
+```text
+Building Phonemod 2.0.0-alpha.12
+Building Phonemod Public API 2.0.0-alpha.12
+Tests run: 37, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+The 37 tests are the same 13 runtime suites as alpha.1 (no new tests landed with the art
+work). **The reproducible-JAR hash recorded below (`cf164f68…`) is now superseded** — the
+art commits changed bundled model/animation resources, so the runtime jar no longer hashes
+to that value. A fresh `scripts/assert-release-jar.sh` hash must be captured at the next
+package before it is cited as release evidence.
 
 ## Automated build and tests
 

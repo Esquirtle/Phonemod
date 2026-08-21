@@ -124,6 +124,19 @@ public interface PhoneApp<S extends Enum<S>> {
     }
 
     /**
+     * Returns the full set of permission nodes required to install and open this
+     * app, or an empty set if the app is freely accessible. Additive over
+     * {@link #getRequiredPermission()}: the default wraps that single node, but
+     * multi-permission apps (e.g. the v2 {@code DeviceApp} adapter) override this
+     * to expose every required node.
+     */
+    @javax.annotation.Nonnull
+    default java.util.Set<String> getRequiredPermissions() {
+        String p = getRequiredPermission();
+        return (p == null || p.isBlank()) ? java.util.Set.of() : java.util.Set.of(p);
+    }
+
+    /**
      * Returns how this app is presented to a player who lacks the required
      * permission.
      *

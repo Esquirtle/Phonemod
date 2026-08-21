@@ -5,6 +5,24 @@ for sequencing, compatibility, test coverage, and release readiness. Architectur
 details in the existing `docs/` directory describe the current v1 implementation unless
 they explicitly say otherwise.
 
+## Reconciliation status — 2026-08-21 (re-verified at alpha.12)
+
+Since the 2026-08-17 reconciliation below (written at alpha.1), the tree advanced
+`alpha.1 → alpha.12`. **That entire range was phone model/animation work plus cache-busting
+`Version` bumps — no release gate advanced.** Build + tests re-verified green on 2026-08-21
+(`mvn -B test`, JDK 25, 37 tests, `BUILD SUCCESS`); evidence in
+`docs/VERIFICATION_EVIDENCE.md`. The `origin/dust-0.5.0` remote branch (Beta design-system
+attempt) is **stale** — HEAD is 30 commits ahead of it and 0 behind, on the older
+pre-v2-split lineage, so it carries no usable Beta progress for the current line. The
+`feature/v2-refactor` branch is still **local-only (unpushed)**.
+
+Gate tally as of alpha.12: **21 done / 100 open (~17%).** Per phase — 1.1: 7 done/22 open ·
+Alpha: 14 done/25 open · Beta: 0/19 · RC: 0/22 (+12-item in-game checklist). The project is
+still firmly in **Alpha**; the frontier gate is 1.1. *(2026-08-21: closed the 1.1
+server-authoritative app-open items + their authorization test via the implementer
+workflow — `AppOpenAuthorizer` + multi-permission fix + 10 tests, build green 37→47, boots
+ENABLED. Uncommitted on `feature/v2-refactor`.)*
+
 ## Reconciliation status — 2026-08-17 (verified)
 
 The checkboxes below predate a large body of implementation and had drifted out of sync.
@@ -170,8 +188,12 @@ contract or persistence model.
 
 ### Server-authoritative actions
 
-- [ ] Enforce installation, device compatibility, ownership, and permission checks in the
-  server-side application-open path. UI visibility never grants authority.
+- [x] Enforce installation, device compatibility, ownership, and permission checks in the
+  server-side application-open path. UI visibility never grants authority. *(2026-08-21:
+  extracted into pure `security/AppOpenAuthorizer` (fail-closed, first-failure-wins) that
+  `DevicePage.openApp` now delegates to; fixed the `DeviceAppAdapter` multi-permission
+  collapse so ALL declared permissions are enforced; unit-tested — see the app-open test
+  below. Exit-gate multiplayer forged-action pass still open.)*
 - [x] Validate total UI payload size, action and app IDs, parameter count, key/value
   lengths, action-specific fields, and current page/app/call state.
 - [x] Catch malformed payloads at the boundary, acknowledge them safely, and avoid leaking
@@ -180,7 +202,13 @@ contract or persistence model.
   idempotent where possible.
 - [x] Rate-limit UI actions, messages, and call attempts per player/session.
 - [ ] Dispatch every target-player ECS operation onto that player's world thread,
-  including administrative application commands.
+  including administrative application commands. *(2026-08-21 cited audit: implementation
+  is code-complete — all 10 target-player ECS mutation sites already hop via
+  `world().execute(...)` (admin install/uninstall/apps commands, OpenPhone, PhoneRegistry,
+  CallRegistry, SyncService, RuntimeAppService.refreshApp, PhoneAnimationController,
+  RuntimeDevicePlatform); DeviceFrameworkCommand transfer/release do no Store op yet. Box
+  left open pending the runtime-proof concurrency test / multiplayer exit pass, not more
+  code.)*
 
 ### Calls and voice
 
@@ -208,8 +236,12 @@ contract or persistence model.
 
 ### 1.1 tests
 
-- [ ] App-open authorization covers hidden UI, forged app IDs, incompatible devices,
-  missing ownership, missing permissions, and revoked permissions.
+- [x] App-open authorization covers hidden UI, forged app IDs, incompatible devices,
+  missing ownership, missing permissions, and revoked permissions. *(2026-08-21:
+  `security/AppOpenAuthorizerTest` — 10 JUnit cases covering hidden-UI-grants-nothing,
+  hidden-UI legit holder, forged app id, incompatible device, missing ownership, missing
+  permission, revoked permission, multi-permission, happy path, and first-failure-wins
+  order. Part of the 37→47 test count.)*
 - [ ] Boundary tests cover malformed payloads, stale actions, size/count/length limits,
   state mismatches, acknowledgements, locks, and rate limits.
 - [ ] Deterministic concurrency tests cover simultaneous calls, repeated transitions,

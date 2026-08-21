@@ -26,6 +26,7 @@ final class DeviceAppAdapter implements PhoneApp<DeviceAppAdapter.State> {
     public String getIconPath() { return descriptor.iconPath(); }
     public int getSortOrder() { return descriptor.sortOrder(); }
     public String getRequiredPermission() { return descriptor.permissions().stream().findFirst().orElse(null); }
+    public java.util.Set<String> getRequiredPermissions() { return descriptor.permissions(); }
     public String[] getSupportedDeviceTypes() { return descriptor.supportedDeviceTypes().toArray(String[]::new); }
     public boolean isSystemApp() { return descriptor.system(); }
     public void onOpen(PhoneAppContext context, UICommandBuilder cmd, UIEventBuilder evb) {
