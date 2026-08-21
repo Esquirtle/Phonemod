@@ -97,8 +97,15 @@ public final class CallRegistry {
         if (route == null) return false;
 
         VoiceModule voice = VoiceModule.get();
-        if (!voice.isVoiceEnabled() || voice.isPlayerMuted(speakerRef.getUuid())
-                || voiceData.opusData == null || voiceData.opusData.length > voice.getMaxPacketSize()) {
+        VoiceRelayDecision.Relay decision = VoiceRelayDecision.decide(
+                true,
+                voice.isVoiceEnabled(),
+                voice.isPlayerMuted(speakerRef.getUuid()),
+                voiceData.opusData != null,
+                voiceData.opusData != null ? voiceData.opusData.length : 0,
+                voice.getMaxPacketSize(),
+                route.speakerEnabled());
+        if (decision == VoiceRelayDecision.Relay.CONSUME_NO_RELAY) {
             return true;
         }
         VoiceModule.PositionSnapshot speakerPosition = voice.getCachedPosition(speakerRef.getUuid());
@@ -109,7 +116,7 @@ public final class CallRegistry {
         var receiverChannel = route.receiver().getPacketHandler().getChannel(StreamType.Voice);
         if (receiverChannel != null && receiverChannel.isActive()) receiverChannel.writeAndFlush(relay);
 
-        if (route.speakerEnabled() && receiverPosition != null) {
+        if (decision == VoiceRelayDecision.Relay.RELAY_PRIVATE_AND_SPEAKER && receiverPosition != null) {
             RelayedVoiceData speakerRelay = relay(voiceData, speakerRef, receiverPosition);
             double speakerRadius = PhoneMod.config().speakerRadiusBlocks();
             double radiusSq = speakerRadius * speakerRadius;
@@ -312,17 +319,23 @@ public final class CallRegistry {
     }
 
     private static void rebuildVoiceRoutesLocked() {
-        Map<UUID, VoiceRoute> routes = new HashMap<>();
         Set<CallSession> sessions = new HashSet<>(BY_ENDPOINT.values());
-        for (CallSession session : sessions) {
-            if (session.state() != CallSession.State.ACTIVE) continue;
-            PhoneRegistry.PresenceEntry caller = PhoneRegistry.getPresenceEntry(session.caller());
-            PhoneRegistry.PresenceEntry callee = PhoneRegistry.getPresenceEntry(session.callee());
-            if (caller == null || callee == null) continue;
-            routes.put(caller.playerRef().getUuid(),
-                    new VoiceRoute(callee.playerRef(), session.speakerEnabled()));
-            routes.put(callee.playerRef().getUuid(),
-                    new VoiceRoute(caller.playerRef(), session.speakerEnabled()));
+        Map<UUID, PlayerRef> refByUuid = new HashMap<>();
+        java.util.function.Function<String, UUID> resolver = endpoint -> {
+            PhoneRegistry.PresenceEntry entry = PhoneRegistry.getPresenceEntry(endpoint);
+            if (entry == null) return null;
+            PlayerRef ref = entry.playerRef();
+            UUID uuid = ref.getUuid();
+            refByUuid.put(uuid, ref);
+            return uuid;
+        };
+        Map<UUID, VoiceRouteSnapshot.RouteView> views =
+                VoiceRouteSnapshot.build(sessions, resolver);
+        Map<UUID, VoiceRoute> routes = new HashMap<>();
+        for (Map.Entry<UUID, VoiceRouteSnapshot.RouteView> view : views.entrySet()) {
+            VoiceRouteSnapshot.RouteView route = view.getValue();
+            routes.put(view.getKey(),
+                    new VoiceRoute(refByUuid.get(route.receiverUuid()), route.speakerEnabled()));
         }
         VOICE_ROUTES.set(Map.copyOf(routes));
     }

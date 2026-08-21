@@ -16,12 +16,15 @@ attempt) is **stale** — HEAD is 30 commits ahead of it and 0 behind, on the ol
 pre-v2-split lineage, so it carries no usable Beta progress for the current line. The
 `feature/v2-refactor` branch is still **local-only (unpushed)**.
 
-Gate tally as of alpha.12: **21 done / 100 open (~17%).** Per phase — 1.1: 7 done/22 open ·
+Gate tally as of alpha.12: **22 done / 99 open (~18%).** Per phase — 1.1: 8 done/21 open ·
 Alpha: 14 done/25 open · Beta: 0/19 · RC: 0/22 (+12-item in-game checklist). The project is
-still firmly in **Alpha**; the frontier gate is 1.1. *(2026-08-21: closed the 1.1
-server-authoritative app-open items + their authorization test via the implementer
-workflow — `AppOpenAuthorizer` + multi-permission fix + 10 tests, build green 37→47, boots
-ENABLED. Uncommitted on `feature/v2-refactor`.)*
+still firmly in **Alpha**; the frontier gate is 1.1. *(2026-08-21, two implementer-workflow
+slices: (1) server-authoritative app-open — `AppOpenAuthorizer` + multi-permission fix + 10
+tests; (2) calls+voice test-hardening — 3 behavior-preserving pure extractions
+(`CallRestoreDecision`/`VoiceRelayDecision`/`VoiceRouteSnapshot`) + 28 tests locking in
+current behavior, all three design questions answered keep-current, `CallAudioPolicy` box
+closed. Build green 37→75, boots ENABLED. The calls+voice **feature** boxes are cited
+impl-complete but stay open pending the in-game multiplayer/voice exit pass.)*
 
 ## Reconciliation status — 2026-08-17 (verified)
 
@@ -216,13 +219,34 @@ contract or persistence model.
   reserves both endpoints.
 - [x] Reject self-calls and overlapping calls; make every transition idempotent.
 - [ ] Keep calls alive when either UI page is dismissed. Track presence separately from an
-  optional open-page handle and restore call UI when the page reopens.
-- [ ] Terminate calls on hangup, disconnect, timeout, or framework shutdown.
-- [ ] Route voice from an immutable concurrent snapshot read by the Netty thread.
-- [ ] Retain and deregister the exact packet-filter registration handle.
-- [ ] Add `CallAudioPolicy` to device assets with `PRIVATE`, `SPEAKER`, and `TOGGLEABLE`.
+  optional open-page handle and restore call UI when the page reopens. *(2026-08-21 cited
+  audit: implemented — `PhoneRegistry` splits `online` page-handle from `presence`;
+  `unregisterPage` retains presence with a page-identity guard; `DevicePage.buildContent`
+  restores on reopen. The reopen-restore precedence is now unit-tested via the pure
+  `CallRestoreDecision` helper. Box left open pending the live page open/dismiss/reopen
+  in-game pass.)*
+- [ ] Terminate calls on hangup, disconnect, timeout, or framework shutdown. *(2026-08-21
+  cited audit: implemented — `hangUp`, `cleanupOnDisconnect` (wired from
+  `PlayerDisconnectEvent`), `checkTimeouts` (RINGING-only, by design decision 2026-08-21),
+  `stopTimeoutWatcher` on shutdown. Box open pending the live reconnect/disconnect pass.)*
+- [ ] Route voice from an immutable concurrent snapshot read by the Netty thread. *(2026-08-21
+  cited audit: implemented — `VOICE_ROUTES` is an `AtomicReference<Map>` rebuilt under
+  `MUTEX` and read lock-free in `VOICE_FILTER`. The route-topology and relay-gating
+  decisions are now unit-tested via the pure `VoiceRouteSnapshot` + `VoiceRelayDecision`
+  helpers. Box open pending the live Netty voice-relay pass — not JUnit-reachable.)*
+- [ ] Retain and deregister the exact packet-filter registration handle. *(2026-08-21 cited
+  audit: implemented + verified correct — `PacketAdapters.registerInbound` returns a
+  wrapper (not your filter), and `deregisterInbound` throws if absent, so retaining the
+  returned `PacketFilter voiceFilterHandle` and deregistering that exact object is
+  load-bearing. Box open pending the live register/deregister pass.)*
+- [x] Add `CallAudioPolicy` to device assets with `PRIVATE`, `SPEAKER`, and `TOGGLEABLE`.
   Private audio is the default; toggleable calls begin private, and only an active
-  endpoint may change speaker state.
+  endpoint may change speaker state. *(2026-08-21: enum + PascalCase codec key
+  `"CallAudioPolicy"` with `PRIVATE` default on `DeviceAsset`; `CallSession` starts speaker
+  only when policy==SPEAKER (TOGGLEABLE→private); `setSpeaker` guards ACTIVE + participant +
+  TOGGLEABLE (either active endpoint may toggle, per 2026-08-21 decision); `CallAudioMode`
+  server override. Fully unit-tested: `DeviceAssetDefaultsTest`, `CallAudioModeTest` (4
+  modes × 3 policies), extended `CallSessionTest` speaker/toggle matrix.)*
 
 ### Persistence and assets
 
@@ -247,7 +271,14 @@ contract or persistence model.
 - [ ] Deterministic concurrency tests cover simultaneous calls, repeated transitions,
   disconnects, timeouts, two worlds, and shutdown.
 - [ ] Call integration tests cover pages open/closed, reopen, reconnect behavior, private
-  and speaker policies, muted voice, and stale client actions.
+  and speaker policies, muted voice, and stale client actions. *(2026-08-21: the
+  unit-testable decision cores are now covered by 28 JUnit tests — reopen-restore
+  precedence (`CallRestoreDecisionTest`), private/speaker/toggleable policy
+  (`CallAudioModeTest` + extended `CallSessionTest`), muted-voice relay gating
+  (`VoiceRelayDecisionTest`), ACTIVE-only route topology (`VoiceRouteSnapshotTest`), and
+  stale/spam actions (`TokenBucketActionGuardTest`). Part of the 47→75 test count. Box
+  left open: the live page open/dismiss/reopen, reconnect, and real Netty voice-relay
+  integration are not JUnit-reachable — they belong to the in-game multiplayer exit pass.)*
 - [ ] Ordered-save tests cover concurrent channel updates, write failure/retry, and
   shutdown during saves.
 - [ ] Asset reload and failed-registration tests prove there are no stale global handles.

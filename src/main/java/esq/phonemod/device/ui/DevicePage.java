@@ -45,6 +45,7 @@ import esq.phonemod.phone.appstore.AppInstallService;
 import esq.phonemod.phone.appstore.DeviceInstalledAppsComponent;
 import esq.phonemod.phone.core.PhoneService;
 import esq.phonemod.phone.messaging.CallRegistry;
+import esq.phonemod.phone.messaging.CallRestoreDecision;
 import esq.phonemod.phone.messaging.PhoneRegistry;
 import esq.phonemod.PhoneMod;
 import esq.phonemod.security.AppOpenAuthorizer;
@@ -139,22 +140,27 @@ public final class DevicePage extends InteractiveCustomUIPage<DevicePage.DeviceE
             String pendingCallee = CallRegistry.getPendingCallee(session.getDeviceId());
             String pendingCaller = CallRegistry.getPendingCaller(session.getDeviceId());
             String content = session.getShell().getContentSelector();
-            if (activePartner != null) {
-                session.setCurrentState(DevicePageState.ACTIVE_CALL);
-                Calls.loadActiveCallState(session.getDeviceId(), activePartner,
-                        activePartner, content, cmd, evb);
-                return;
-            }
-            if (pendingCallee != null) {
-                session.setCurrentState(DevicePageState.ACTIVE_CALL);
-                Calls.loadActiveCallState(session.getDeviceId(), pendingCallee,
-                        "Calling...", content, cmd, evb);
-                return;
-            }
-            if (pendingCaller != null) {
-                session.setCurrentState(DevicePageState.INCOMING_CALL);
-                Calls.loadIncomingCallState(pendingCaller, pendingCaller, content, cmd, evb);
-                return;
+            CallRestoreDecision.Restore restore = CallRestoreDecision.resolve(
+                    activePartner, pendingCallee, pendingCaller);
+            switch (restore.kind()) {
+                case ACTIVE -> {
+                    session.setCurrentState(DevicePageState.ACTIVE_CALL);
+                    Calls.loadActiveCallState(session.getDeviceId(), restore.value(),
+                            restore.value(), content, cmd, evb);
+                    return;
+                }
+                case OUTGOING -> {
+                    session.setCurrentState(DevicePageState.ACTIVE_CALL);
+                    Calls.loadActiveCallState(session.getDeviceId(), restore.value(),
+                            "Calling...", content, cmd, evb);
+                    return;
+                }
+                case INCOMING -> {
+                    session.setCurrentState(DevicePageState.INCOMING_CALL);
+                    Calls.loadIncomingCallState(restore.value(), restore.value(), content, cmd, evb);
+                    return;
+                }
+                case NONE -> { }
             }
         }
 

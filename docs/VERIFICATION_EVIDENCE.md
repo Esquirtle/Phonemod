@@ -5,6 +5,42 @@ JDK 25. (Build, test and consumer-compile sections were re-verified on 2026-08-1
 hytest deployment and asset-validation sections below still date from 2026-08-14/15 and
 are unchanged.)
 
+## 1.1 calls + voice test-hardening — 2026-08-21 (implementer workflow)
+
+The "Calls and voice" cluster was found (cited architect audit) to be **already
+implemented and wired** in the committed tree; this slice makes its security-relevant
+decisions unit-testable without Mockito and locks in current behavior. All three design
+questions were answered **keep-current** by the user (RINGING-only call timeout;
+caller's-device governs speaker policy; either active endpoint may toggle speaker).
+
+Three new **pure, side-effect-free** helpers, with the existing runtime delegating to them
+(behavior-preserving — only `DevicePage.java` and `CallRegistry.java` changed vs HEAD,
+`CallSession.java` untouched):
+- **`CallRestoreDecision`** — reopen-restore precedence (ACTIVE > pending-outgoing >
+  pending-incoming > none); `DevicePage.buildContent` delegates.
+- **`VoiceRelayDecision`** — the `VOICE_FILTER` gate ladder (`DROP_NO_ROUTE` /
+  `CONSUME_NO_RELAY` / `RELAY_PRIVATE` / `RELAY_PRIVATE_AND_SPEAKER`); the Netty side keeps
+  all channel I/O. (Benign deviation: `VoiceModule` mute/size accessors are now evaluated
+  eagerly to pass as params — verified pure config reads, identical consume-vs-relay
+  result; the `route==null` early-return stays before any `VoiceModule` call.)
+- **`VoiceRouteSnapshot`** — the ACTIVE-only, symmetric route topology; `CallRegistry`
+  keeps the side-effecting `receiverUuid`→`PlayerRef` wrapping outside the pure helper.
+
+Seven JUnit suites (+28 tests): extended `CallSessionTest` (end reasons, speaker-clear-on-
+end, speaker-after-end rejection, partnerOf/contains, speaker-default + who-may-toggle
+matrix), new `CallAudioModeTest` (4 modes × 3 policies), `DeviceAssetDefaultsTest` (default
+`PRIVATE`), `CallRestoreDecisionTest`, `VoiceRelayDecisionTest`, `VoiceRouteSnapshotTest`
+(fake-UUID resolver lambda, no `PlayerRef`), `TokenBucketActionGuardTest`.
+
+Verified: `mvn -B -f Phonemod/pom.xml package` exit 0, **`Tests run: 75, Failures: 0`** (up
+from 47). Parity reviewed against HEAD `0a13bc9` — no runtime behavior changed. Packaged
+jar booted alone in a fresh universe → `Enabled plugin esq.phonemod:Phonemod` → `Universe
+ready!` → `Hytale Server Booted!`, clean shutdown, no plugin-attributable exception.
+
+**Closed:** the `CallAudioPolicy` feature box. **Still open** (in-game exit pass, not
+JUnit-reachable): live page open/dismiss/reopen, reconnect, real Netty voice relay +
+speaker fan-out, and live packet-filter register/deregister.
+
 ## 1.1 app-open authorization — 2026-08-21 (implementer workflow)
 
 Closed the two 1.1 server-authoritative app-open plan items + their authorization test.

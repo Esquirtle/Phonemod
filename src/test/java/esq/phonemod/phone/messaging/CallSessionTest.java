@@ -43,6 +43,72 @@ class CallSessionTest {
         assertEquals(1, successes.get());
     }
 
+    @Test
+    void endRecordsReasonAndClearsSpeaker() {
+        CallSession call = new CallSession("a", "b", "Bee", 1, CallAudioPolicy.SPEAKER);
+        assertNull(call.endReason());
+        assertTrue(call.answer("b"));
+        assertTrue(call.speakerEnabled());
+        assertTrue(call.end(CallSession.EndReason.DISCONNECT));
+        assertEquals(CallSession.EndReason.DISCONNECT, call.endReason());
+        assertFalse(call.speakerEnabled());
+    }
+
+    @Test
+    void endReasonIsPinnedToFirstEnd() {
+        CallSession call = new CallSession("a", "b", "Bee", 1, CallAudioPolicy.PRIVATE);
+        assertTrue(call.end(CallSession.EndReason.TIMEOUT));
+        assertFalse(call.end(CallSession.EndReason.HANGUP));
+        assertEquals(CallSession.EndReason.TIMEOUT, call.endReason());
+    }
+
+    @Test
+    void speakerCannotBeToggledAfterEnd() {
+        CallSession call = new CallSession("a", "b", "Bee", 1, CallAudioPolicy.TOGGLEABLE);
+        assertTrue(call.answer("b"));
+        assertTrue(call.end(CallSession.EndReason.HANGUP));
+        assertFalse(call.setSpeaker("a", true));
+        assertFalse(call.setSpeaker("b", true));
+        assertFalse(call.speakerEnabled());
+    }
+
+    @Test
+    void partnerOfResolvesBothEndpointsAndRejectsStrangers() {
+        CallSession call = new CallSession("a", "b", "Bee", 1, CallAudioPolicy.PRIVATE);
+        assertEquals("b", call.partnerOf("a"));
+        assertEquals("a", call.partnerOf("b"));
+        assertNull(call.partnerOf("c"));
+        assertTrue(call.contains("a"));
+        assertTrue(call.contains("b"));
+        assertFalse(call.contains("c"));
+    }
+
+    @Test
+    void speakerDefaultFollowsPolicyMatrix() {
+        assertTrue(new CallSession("a", "b", "Bee", 1, CallAudioPolicy.SPEAKER).speakerEnabled());
+        assertFalse(new CallSession("a", "b", "Bee", 1, CallAudioPolicy.PRIVATE).speakerEnabled());
+        assertFalse(new CallSession("a", "b", "Bee", 1, CallAudioPolicy.TOGGLEABLE).speakerEnabled());
+    }
+
+    @Test
+    void speakerPolicyGovernsWhoMayToggle() {
+        CallSession privateCall = new CallSession("a", "b", "Bee", 1, CallAudioPolicy.PRIVATE);
+        assertTrue(privateCall.answer("b"));
+        assertFalse(privateCall.setSpeaker("a", true));
+        assertFalse(privateCall.setSpeaker("b", true));
+
+        CallSession speakerCall = new CallSession("a", "b", "Bee", 1, CallAudioPolicy.SPEAKER);
+        assertTrue(speakerCall.answer("b"));
+        assertFalse(speakerCall.setSpeaker("a", false));
+        assertTrue(speakerCall.speakerEnabled());
+
+        CallSession toggle = new CallSession("a", "b", "Bee", 1, CallAudioPolicy.TOGGLEABLE);
+        assertTrue(toggle.answer("b"));
+        assertTrue(toggle.setSpeaker("a", true));
+        assertTrue(toggle.setSpeaker("b", false));
+        assertFalse(toggle.speakerEnabled());
+    }
+
     private static void answer(CallSession call, CountDownLatch start, AtomicInteger successes) {
         try {
             start.await();
