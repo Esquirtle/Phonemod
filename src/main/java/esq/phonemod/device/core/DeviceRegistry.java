@@ -7,6 +7,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * Resolves and caches runtime device shells.
@@ -16,11 +17,21 @@ public final class DeviceRegistry {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
     private final Map<String, DeviceShell> shells = new ConcurrentHashMap<>();
+    /** Resolves an asset id to its {@link DeviceAsset}; injectable so tests avoid the asset store. */
+    private final Function<String, DeviceAsset> resolver;
+
+    public DeviceRegistry() {
+        this(id -> DeviceAsset.getAssetMap().getAsset(id));
+    }
+
+    DeviceRegistry(@Nonnull Function<String, DeviceAsset> resolver) {
+        this.resolver = resolver;
+    }
 
     @Nullable
     public DeviceAsset getAsset(@Nonnull String assetId) {
         try {
-            return DeviceAsset.getAssetMap().getAsset(assetId);
+            return resolver.apply(assetId);
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log("[DeviceRegistry] Failed to resolve device asset %s", assetId);
             return null;

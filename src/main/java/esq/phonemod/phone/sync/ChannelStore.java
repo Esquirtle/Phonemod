@@ -4,6 +4,7 @@ import com.hypixel.hytale.codec.util.RawJsonReader;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.util.BsonUtil;
 import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.StorageManager;
 import org.bson.BsonDocument;
 
 import javax.annotation.Nonnull;
@@ -11,10 +12,13 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * JSON persistence for sync channels, under {@code <dataDir>/channels/<typeId>/}.
@@ -30,10 +34,32 @@ final class ChannelStore {
 
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
 
+    /**
+     * Total wall-clock budget for the shutdown flush of all persistent channels.
+     * Bounds {@link #saveBlocking} so a held Universe saving lock (whose queued
+     * {@code doSave} only completes on release) can never hang shutdown indefinitely.
+     */
+    static final Duration SHUTDOWN_FLUSH_TIMEOUT = Duration.ofSeconds(5);
+
+    /** Write seam: how a {@link BsonDocument} is rendered to a path (real impl {@link BsonUtil#writeDocument}). */
+    @FunctionalInterface
+    interface BsonWriter {
+        @Nonnull
+        CompletableFuture<Void> write(@Nonnull Path path, @Nonnull BsonDocument document);
+    }
+
     private final Path baseDir;
+    private final StorageManager storage;
+    private final BsonWriter writer;
 
     ChannelStore(@Nonnull Path dataDir) {
+        this(dataDir, Universe.get().getStorageManager(), BsonUtil::writeDocument);
+    }
+
+    ChannelStore(@Nonnull Path dataDir, @Nonnull StorageManager storage, @Nonnull BsonWriter writer) {
         this.baseDir = dataDir.resolve("channels");
+        this.storage = storage;
+        this.writer = writer;
     }
 
     @Nonnull
@@ -54,8 +80,8 @@ final class ChannelStore {
                 return null;
             }
             Path path = pathFor(type, channel.id());
-            return Universe.get().getStorageManager()
-                    .doSave(path, () -> BsonUtil.writeDocument(path, snapshot.document()))
+            return storage
+                    .doSave(path, () -> writer.write(path, snapshot.document()))
                     .thenApply(ignored -> new SaveResult(snapshot.sequence(), snapshot.hash()));
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
@@ -64,14 +90,47 @@ final class ChannelStore {
         }
     }
 
-    /** Synchronously flushes a channel's state (used on shutdown). */
+    /**
+     * Synchronously flushes a channel's state (used on shutdown), bounding the wait by
+     * {@link #SHUTDOWN_FLUSH_TIMEOUT}. Delegates to {@link #saveBlocking(SyncChannel, long)}
+     * with a fresh per-channel deadline; callers flushing many channels should share one
+     * deadline via the overload so the total shutdown delay stays bounded.
+     */
     <S> void saveBlocking(@Nonnull SyncChannel<S> channel) {
+        saveBlocking(channel, System.nanoTime() + SHUTDOWN_FLUSH_TIMEOUT.toNanos());
+    }
+
+    /**
+     * Synchronously flushes a channel's state, waiting at most until {@code deadlineNanos}
+     * (a {@link System#nanoTime()} stamp). If the write does not complete within the
+     * remaining budget — e.g. the Universe saving lock is held at shutdown, leaving the
+     * queued {@code doSave} to complete only on release — this logs a warning and returns
+     * WITHOUT calling {@link SyncChannel#markSaved}. The channel's {@code savedHash} stays
+     * un-advanced, so the state remains dirty and is retried passively on the next save;
+     * the queued write still lands later when the lock releases.
+     */
+    <S> void saveBlocking(@Nonnull SyncChannel<S> channel, long deadlineNanos) {
+        CompletableFuture<SaveResult> future;
         try {
-            CompletableFuture<SaveResult> future = save(channel);
-            if (future != null) {
-                SaveResult result = future.join();
-                channel.markSaved(result.sequence(), result.hash());
-            }
+            future = save(channel);
+        } catch (Exception e) {
+            LOGGER.atWarning().withCause(e).log(
+                    "[ChannelStore] Failed to flush channel %s/%s",
+                    channel.type().typeId(), channel.id());
+            return;
+        }
+        if (future == null) {
+            return;
+        }
+        long remaining = Math.max(0L, deadlineNanos - System.nanoTime());
+        try {
+            SaveResult result = future.get(remaining, TimeUnit.NANOSECONDS);
+            channel.markSaved(result.sequence(), result.hash());
+        } catch (TimeoutException e) {
+            LOGGER.atWarning().log(
+                    "[ChannelStore] Shutdown flush timed out for channel %s/%s after %ds;"
+                            + " leaving it dirty for passive retry (queued write completes on lock release)",
+                    channel.type().typeId(), channel.id(), SHUTDOWN_FLUSH_TIMEOUT.toSeconds());
         } catch (Exception e) {
             LOGGER.atWarning().withCause(e).log(
                     "[ChannelStore] Failed to flush channel %s/%s",
@@ -138,7 +197,7 @@ final class ChannelStore {
 
     private void deleteQuietly(@Nonnull Path path) {
         try {
-            Universe.get().getStorageManager().doSave(path, () -> {
+            storage.doSave(path, () -> {
                 try {
                     Files.deleteIfExists(path);
                     return CompletableFuture.completedFuture(null);

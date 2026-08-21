@@ -16,14 +16,16 @@ public class InteractionSetupManager {
     }
 
     public void register() {
+        LOGGER.atInfo().log("Registering interactions...");
+        RequiredRegistration required = new RequiredRegistration()
+                .step("phone interaction", () ->
+                        plugin.getCodecRegistry(Interaction.CODEC)
+                                .register("open_phone", OpenPhone.class, OpenPhone.CODEC));
         try {
-            LOGGER.atInfo().log("Registering interactions...");
-            plugin.getCodecRegistry(Interaction.CODEC)
-                    .register("open_phone", OpenPhone.class, OpenPhone.CODEC);
-        } catch (Exception e) {
+            required.run();
+        } catch (RuntimeException e) {
             LOGGER.atSevere().withCause(e).log("Failed to register interactions!");
-            throw new IllegalStateException("Required phone interaction registration failed", e);
+            throw e;
         }
-
     }
 }

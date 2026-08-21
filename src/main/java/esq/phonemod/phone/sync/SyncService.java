@@ -78,15 +78,23 @@ public final class SyncService {
         LOGGER.atFine().log("[SyncService] Loaded persistent channels for type %s", type.typeId());
     }
 
-    /** Synchronously flushes all persistent channels. Call on shutdown. */
+    /**
+     * Synchronously flushes all persistent channels. Call on shutdown.
+     *
+     * <p>Uses a single shared deadline for the whole sweep so the total shutdown delay is
+     * bounded to {@link ChannelStore#SHUTDOWN_FLUSH_TIMEOUT}, not that timeout multiplied by
+     * the number of channels — critical when the Universe saving lock is held and every
+     * per-channel {@code get} would otherwise wait the full budget.
+     */
     public static void flushAll() {
         ChannelStore s = store;
         if (s == null) {
             return;
         }
+        long deadlineNanos = System.nanoTime() + ChannelStore.SHUTDOWN_FLUSH_TIMEOUT.toNanos();
         for (SyncChannel<?> channel : CHANNELS.values()) {
             if (channel.type().persistence() == ChannelPersistence.PERSISTENT) {
-                s.saveBlocking(channel);
+                s.saveBlocking(channel, deadlineNanos);
             }
         }
     }

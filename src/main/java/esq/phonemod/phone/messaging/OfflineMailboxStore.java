@@ -6,10 +6,12 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.util.RawJsonReader;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.universe.StorageManager;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.util.BsonUtil;
 import esq.phonemod.PhoneMod;
 import esq.phonemod.operations.OperationalMetrics;
+import org.bson.BsonDocument;
 
 import javax.annotation.Nonnull;
 import java.nio.charset.StandardCharsets;
@@ -25,10 +27,29 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Bounded, lazy-loaded, per-address persistent offline mailboxes. */
 final class OfflineMailboxStore {
     private static final HytaleLogger LOGGER = HytaleLogger.forEnclosingClass();
+
+    /** Write seam mirroring {@code BsonUtil::writeDocument}; injectable for tests. */
+    @FunctionalInterface
+    interface BsonWriter {
+        @Nonnull
+        CompletableFuture<Void> write(@Nonnull Path path, @Nonnull BsonDocument document);
+    }
+
     private final Map<String, Mailbox> mailboxes = new ConcurrentHashMap<>();
     private Path baseDir;
+    private StorageManager storage;
+    private BsonWriter writer;
 
-    void init() { baseDir = Universe.get().getPath().resolve("Phonemod").resolve("mailboxes"); }
+    void init() {
+        init(Universe.get().getPath().resolve("Phonemod").resolve("mailboxes"),
+                Universe.get().getStorageManager(), BsonUtil::writeDocument);
+    }
+
+    void init(@Nonnull Path baseDir, @Nonnull StorageManager storage, @Nonnull BsonWriter writer) {
+        this.baseDir = baseDir;
+        this.storage = storage;
+        this.writer = writer;
+    }
 
     void enqueue(@Nonnull String address, @Nonnull TextMessage message, long queuedAtMillis) {
         Mailbox box = box(address);
@@ -105,8 +126,8 @@ final class OfflineMailboxStore {
         var encoded = MailboxDocument.CODEC.encode(document).asDocument();
         Path path = pathFor(address);
         box.pending = box.pending.handle((ignored, previousError) -> null)
-                .thenCompose(ignored -> Universe.get().getStorageManager()
-                        .doSave(path, () -> BsonUtil.writeDocument(path, encoded)));
+                .thenCompose(ignored -> storage
+                        .doSave(path, () -> writer.write(path, encoded)));
         box.pending.whenComplete((ignored, error) -> {
             if (error != null) {
                 OperationalMetrics.get().saveFailure();

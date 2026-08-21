@@ -5,6 +5,47 @@ JDK 25. (Build, test and consumer-compile sections were re-verified on 2026-08-1
 hytest deployment and asset-validation sections below still date from 2026-08-14/15 and
 are unchanged.)
 
+## 1.1 persistence + assets — 2026-08-21 (implementer workflow)
+
+Audit (cited) found the whole "Persistence and assets" cluster already implemented (sync +
+mailbox saves route through `StorageManager.doSave`; snapshot-under-lock with hash committed
+only on success; plugin-owned auto-unregistering asset/codec/component registries;
+shell-cache invalidation on `LoadedAssetsEvent`; fail-fast on interaction/codec
+registration). This slice makes those decision cores unit-testable and fixes one latent bug.
+
+Four behavior-preserving injection seams (public/no-arg paths unchanged — verified by diff):
+- **`ChannelStore`** — package-private ctor + a `BsonWriter` seam; the real path still uses
+  `Universe.get().getStorageManager()` + `BsonUtil::writeDocument`.
+- **`OfflineMailboxStore`** — an injectable `init(baseDir, storage, writer)` beside the
+  delegating no-arg `init()`.
+- **`DeviceRegistry`** — an injectable asset-resolver ctor; no-arg supplies the static
+  asset-map lookup.
+- **`RequiredRegistration`** (new, pure) — fail-fast sequencer; `InteractionSetupManager`
+  routes its required interaction+codec registration through it (interactions/codecs only,
+  per the 2026-08-21 decision).
+
+**Real fix — bounded shutdown flush.** `ChannelStore.saveBlocking` previously `join()`-ed a
+write future that, if the Universe saving lock was held (e.g. a backup at shutdown), only
+completed on lock release — an unbounded hang. Now `SyncService.flushAll` computes one
+shared `~5s` deadline and passes the remaining budget to each `saveBlocking`, so total
+shutdown is bounded regardless of channel count; on timeout it logs and returns without
+`markSaved` (state stays dirty → passive retry).
+
+Five JUnit suites (+21 tests, real `StorageManager` + `@TempDir`, deterministic — barriers
+and gated futures, no sleeps): `SyncChannelStateTest`, `ChannelStorePersistenceTest`
+(incl. concurrent-serialization, write-failure passive-retry, and the shutdown-no-hang proof
+via a never-completing future + `assertTimeoutPreemptively`), `OfflineMailboxOrderedSaveTest`,
+`DeviceShellReloadTest`, `RequiredRegistrationTest`.
+
+Verified: `mvn -B test` exit 0, **`Tests run: 96, Failures: 0`** (up from 75), parity
+reviewed against HEAD (only intended change = the bounded flush), boots to
+`Enabled plugin esq.phonemod:Phonemod` with a clean bounded shutdown.
+
+**Test-only caveats** (no production impact): the metric-failure case uses same-package
+reflective static injection; the mailbox test installs a config-only `PhoneMod` double via
+`sun.misc.Unsafe` (green with a benign deprecation warning — worth replacing with a proper
+config seam later, since `Unsafe` is deprecated-for-removal).
+
 ## 1.1 calls + voice test-hardening — 2026-08-21 (implementer workflow)
 
 The "Calls and voice" cluster was found (cited architect audit) to be **already
