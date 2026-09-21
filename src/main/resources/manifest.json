@@ -2,10 +2,10 @@
   "Group": "esq.phonemod",
   "Name": "Phonemod",
   "Version": "${project.version}",
-  "Description": "Phonemod .\nPowered by Playground-Core",
+  "Description": "Phonemod, calls, messages, and more.",
   "Authors": [{"Name": "esquirtle"}],
   "Main": "esq.phonemod.PhoneMod",
   "LoadOrder": "POSTWORLD",
-  "ServerVersion": "*",
+  "ServerVersion": ">=0.6.0 <0.7.0",
   "IncludesAssetPack": true
 }
