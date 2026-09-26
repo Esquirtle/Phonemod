@@ -13,8 +13,6 @@ import esq.phonemod.platform.RuntimeDevicePlatform;
 import esq.phonemod.PhoneMod;
 import esq.phonemod.operations.OperationalMetrics;
 import esq.phonemod.phone.sync.SyncService;
-import esq.phonemod.telemetry.PhonemodTelemetryService;
-import esq.telemetry.TelemetryStatus;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
@@ -28,59 +26,6 @@ public final class DeviceFrameworkCommand extends AbstractCommandCollection {
         addSubCommand(new Migration());
         addSubCommand(new Transfer());
         addSubCommand(new Release());
-        addSubCommand(new TelemetryCommand());
-    }
-
-    /** {@code /deviceframework telemetry status|preview|enable|disable} — esq-telemetry controls. */
-    private static final class TelemetryCommand extends AbstractCommandCollection {
-        TelemetryCommand() {
-            super("telemetry", "esq-telemetry status and controls");
-            addSubCommand(new TelemetryStatusCmd());
-            addSubCommand(new TelemetryPreviewCmd());
-            addSubCommand(new TelemetryToggleCmd(true));
-            addSubCommand(new TelemetryToggleCmd(false));
-        }
-    }
-
-    private static final class TelemetryStatusCmd extends CommandBase {
-        TelemetryStatusCmd() { super("status", "Shows whether esq telemetry is enabled"); }
-        protected void executeSync(@Nonnull CommandContext context) {
-            PhonemodTelemetryService telemetry = PhoneMod.getInstance().getTelemetryService();
-            String state = telemetry.isEnabled() ? "ON"
-                    : (telemetry.isNoop() && PhoneMod.config().telemetry().isEnabled()
-                        ? "set to ON (needs a restart)" : "OFF");
-            context.sendMessage(Message.raw("esq telemetry is " + state + "."));
-            TelemetryStatus status = telemetry.status();
-            if (!status.noop()) {
-                context.sendMessage(Message.raw("installId=" + status.installId()
-                        + " lastSend=" + (status.lastSendAttemptAt() != null ? status.lastSendAttemptAt() : "never")
-                        + " lastResult=" + (status.lastSendResult() != null ? status.lastSendResult() : "none")
-                        + " nextSend=" + (status.nextSendAt() != null ? status.nextSendAt() : "never")));
-            }
-        }
-    }
-
-    private static final class TelemetryPreviewCmd extends CommandBase {
-        TelemetryPreviewCmd() { super("preview", "Shows the next telemetry batch without sending it"); }
-        protected void executeSync(@Nonnull CommandContext context) {
-            context.sendMessage(Message.raw(PhoneMod.getInstance().getTelemetryService().previewJson()));
-        }
-    }
-
-    private static final class TelemetryToggleCmd extends CommandBase {
-        private final boolean enable;
-        TelemetryToggleCmd(boolean enable) {
-            super(enable ? "enable" : "disable", "Turns esq telemetry " + (enable ? "on" : "off") + " (hot toggle, no restart)");
-            this.enable = enable;
-        }
-        protected void executeSync(@Nonnull CommandContext context) {
-            var outcome = PhoneMod.getInstance().getTelemetryService().setEnabled(enable);
-            String result = !enable ? "esq telemetry disabled."
-                    : (outcome == PhonemodTelemetryService.EnableOutcome.PENDING_RESTART
-                        ? "esq telemetry set to enabled; takes effect after a restart."
-                        : "esq telemetry enabled.");
-            context.sendMessage(Message.raw(result));
-        }
     }
 
     private static final class Status extends CommandBase {
