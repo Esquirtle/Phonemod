@@ -7,6 +7,7 @@ import com.hypixel.hytale.server.core.util.Config;
 import esq.phonemod.config.PhonemodConfig;
 import esq.phonemod.setup.SetupManager;
 import esq.phonemod.operations.AssetHealthService;
+import esq.phonemod.telemetry.PhonemodTelemetryService;
 
 import javax.annotation.Nonnull;
 import java.util.concurrent.CompletableFuture;
@@ -26,6 +27,7 @@ public class PhoneMod extends JavaPlugin {
     private final Config<PhonemodConfig> config;
     private final Object configSaveLock = new Object();
     private CompletableFuture<Void> pendingConfigSave = CompletableFuture.completedFuture(null);
+    private PhonemodTelemetryService telemetryService;
 
     public PhoneMod(@Nonnull JavaPluginInit init) {
         super(init);
@@ -51,6 +53,10 @@ public class PhoneMod extends JavaPlugin {
                 : setupManager.assetHealth();
     }
 
+    public PhonemodTelemetryService getTelemetryService() {
+        return telemetryService;
+    }
+
     /**
      * Persists runtime configuration edits in submission order. Encoding happens when the
      * queued save begins, so a burst of UI edits converges on the latest validated values
@@ -68,6 +74,9 @@ public class PhoneMod extends JavaPlugin {
     @Override
     protected void setup() {
         LOGGER.at(Level.INFO).log("[Phonemod] Setting up...");
+        // esq-telemetry: first action, before SetupManager builds anything, so it can capture
+        // errors from the rest of setup().
+        this.telemetryService = new PhonemodTelemetryService(this, this.config.get());
         this.setupManager = new SetupManager(this);
         LOGGER.at(Level.INFO).log("[Phonemod] Setup complete!");
     }
@@ -96,6 +105,11 @@ public class PhoneMod extends JavaPlugin {
         }
         if (setupManager != null) {
             setupManager.shutdown();
+        }
+        // esq-telemetry: last action, a final bounded flush (2s cap) so anything queued up to
+        // this point still has a chance to leave.
+        if (telemetryService != null) {
+            telemetryService.close();
         }
         instance = null;
     }

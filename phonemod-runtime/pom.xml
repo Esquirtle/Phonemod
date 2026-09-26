@@ -70,8 +70,18 @@
                     <artifactSet>
                         <includes>
                             <include>esq.phonemod:phonemod-api</include>
+                            <include>esq:esq-telemetry</include>
                         </includes>
                     </artifactSet>
+                    <!-- esq-telemetry (D-199 pattern from PinaCore-RP): own copy per plugin, so
+                         this plugin never bridges with another third party's unshaded
+                         esq.telemetry (PluginClassLoader.java:133-141). -->
+                    <relocations>
+                        <relocation>
+                            <pattern>esq.telemetry</pattern>
+                            <shadedPattern>esq.phonemod.internal.telemetry</shadedPattern>
+                        </relocation>
+                    </relocations>
                 </configuration>
             </plugin>
             <plugin>
@@ -92,6 +102,14 @@
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
+        </dependency>
+
+        <!-- esq-telemetry: compiled from ~/.m2 after `mvn install` in the sibling
+             HYTALE-KOTLIN-PLUGINS/esq-telemetry/ workspace folder, shade-relocated above. -->
+        <dependency>
+            <groupId>esq</groupId>
+            <artifactId>esq-telemetry</artifactId>
+            <version>1.1.0</version>
         </dependency>
     </dependencies>
 </project>

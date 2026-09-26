@@ -6,6 +6,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.EnumCodec;
 import com.hypixel.hytale.codec.validation.Validators;
 import esq.phonemod.security.UiSafetyLimits;
+import esq.telemetry.hytale.TelemetrySettings;
 
 import javax.annotation.Nonnull;
 
@@ -103,6 +104,10 @@ public final class PhonemodConfig implements UiSafetyLimits {
                             (c, v) -> c.offlineMessagingEnabled = v, c -> c.offlineMessagingEnabled)
                     .documentation("Queue bounded offline messages for later delivery.")
                     .add()
+                    .append(new KeyedCodec<>("Telemetry", TelemetrySettings.CODEC),
+                            (c, v) -> c.telemetry = v, c -> c.telemetry)
+                    .documentation("esq-telemetry settings (usage counts + sanitised error fingerprints; never player identity).")
+                    .add()
                     .build();
 
     private int maxUiEventBytes = 8 * 1024;
@@ -129,6 +134,7 @@ public final class PhonemodConfig implements UiSafetyLimits {
     private volatile int callRingTimeoutSeconds = 30;
     private volatile int speakerRadiusBlocks = 8;
     private volatile boolean offlineMessagingEnabled = true;
+    private volatile TelemetrySettings telemetry = new TelemetrySettings();
 
     public int maxUiEventBytes() { return maxUiEventBytes; }
     public int maxUiParameters() { return maxUiParameters; }
@@ -154,6 +160,12 @@ public final class PhonemodConfig implements UiSafetyLimits {
     public int callRingTimeoutSeconds() { return callRingTimeoutSeconds; }
     public int speakerRadiusBlocks() { return speakerRadiusBlocks; }
     public boolean offlineMessagingEnabled() { return offlineMessagingEnabled; }
+    /** esq-telemetry settings (usage counts + sanitised error fingerprints; never player identity). */
+    @Nonnull public TelemetrySettings telemetry() { return telemetry; }
+
+    public void setTelemetry(@Nonnull TelemetrySettings value) {
+        telemetry = java.util.Objects.requireNonNull(value, "value");
+    }
 
     public void setAddressBindingMode(@Nonnull AddressBindingMode value) {
         addressBindingMode = java.util.Objects.requireNonNull(value, "value");
