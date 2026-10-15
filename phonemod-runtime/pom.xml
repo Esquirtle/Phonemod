@@ -97,6 +97,16 @@
             <artifactId>phonemod-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- F2 (plan sec.4): ui-kit is test-scope ONLY here, so it never enters the
+             shaded jar (artifactSet above still lists only api + telemetry). It is
+             needed by ActionPipelineContractTest, which lives in this module's test
+             tree because that is where esq.phonemod.security is visible. -->
+        <dependency>
+            <groupId>esq.phonemod</groupId>
+            <artifactId>phonemod-ui-kit</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

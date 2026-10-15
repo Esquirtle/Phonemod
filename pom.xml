@@ -16,6 +16,7 @@
 
     <modules>
         <module>phonemod-api</module>
+        <module>phonemod-ui-kit</module>
         <module>phonemod-runtime</module>
     </modules>
 
@@ -25,4 +26,50 @@
         <junit.version>5.12.2</junit.version>
         <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
     </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- F2 (plan sec.4): default run excludes @Tag("contract") (the 60
+                     skeleton tests); the `contract` profile flips to running ONLY
+                     them. Same fork/argLine as phonemod-runtime so HytaleLogManager
+                     installs before java.util.logging initializes. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <forkCount>1</forkCount>
+                        <reuseForks>true</reuseForks>
+                        <argLine>-Djava.util.logging.manager=com.hypixel.hytale.logger.backend.HytaleLogManager</argLine>
+                        <!-- surefire 3.0.0-M5 fallback (plan sec.4): the positive
+                             `groups` selector, honoured reliably by M5, is used in
+                             both the default run and the `contract` profile below,
+                             instead of relying on excludedGroups override merge. -->
+                        <groups>!contract</groups>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>contract</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <forkCount>1</forkCount>
+                            <reuseForks>true</reuseForks>
+                            <argLine>-Djava.util.logging.manager=com.hypixel.hytale.logger.backend.HytaleLogManager</argLine>
+                            <groups>contract</groups>
+                            <excludedGroups combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

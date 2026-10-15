@@ -1,0 +1,55 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>esq.phonemod</groupId>
+        <artifactId>phonemod-parent</artifactId>
+        <version>2.0.0-alpha.13</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    <groupId>esq.phonemod</groupId>
+    <artifactId>phonemod-ui-kit</artifactId>
+    <name>Phonemod UI Kit</name>
+    <description>
+        Backend-neutral rendering/diff/action-pipeline layer shared by the legacy
+        and (experimental) Noesis backends. Never imports Hytale UI types
+        (R-KIT, checked by bin/check-api-no-ui-imports.sh).
+    </description>
+    <properties>
+        <hytale.install-dir>${project.basedir}/../../HytaleServer.jar</hytale.install-dir>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>esq.phonemod</groupId>
+            <artifactId>phonemod-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Same system-scoped dep as phonemod-api, needed for PlayerRef in
+             DeviceSessionInfo and for the ui-kit test sources. -->
+        <dependency>
+            <groupId>com.hytale</groupId>
+            <artifactId>hytale-server</artifactId>
+            <version>LOCAL</version>
+            <scope>system</scope>
+            <systemPath>${hytale.install-dir}</systemPath>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration><forceCreation>true</forceCreation></configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

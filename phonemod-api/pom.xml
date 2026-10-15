@@ -27,6 +27,13 @@
             <systemPath>${hytale.install-dir}</systemPath>
             <optional>true</optional>
         </dependency>
+        <!-- F2 (plan sec.4): JUnit, test scope, for the api/v3 contract tests. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
