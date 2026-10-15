@@ -1,0 +1,30 @@
+# Phonemod 3.0 — Decisiones
+
+Fuente previa: doc "Phonemod 3.0 — Plan de reescritura"
+(https://claude.ai/code/artifact/c193bea1-75d7-466e-8eb3-ec26864d122a), rev 19.
+
+| id | fecha | pregunta | respuesta | decidido por | afecta |
+|---|---|---|---|---|---|
+| D-1 | 2026-10-15 | Alcance de Noesis | Seam + spike: core neutral ya; backend Noesis completo solo si el spike da go y Hypixel quita el preview | user | R-NOE, F1, F8 |
+| D-2 | 2026-10-15 | Lenguaje | Java (la API sigue consumible por los 13 consumidores Java sin shadear kotlin-stdlib) | user | todo |
+| D-3 | 2026-10-15 | Versión y compatibilidad | 3.0 rompe v1 y v2: se eliminan PhoneApp, StatefulPhoneApp, PhoneUi, PhoneAppContext, LegacyRooms y el DeviceApp v2 actual. Sin adaptadores | user | R-API, R-LEG |
+| D-4 | 2026-10-15 | Consumidores en este plan | 6 apps nativas + hello-device-app + tuiter-app (piloto). Los otros 10 quedan en 2.x hasta su ola | user | R-APP, F6, F7 |
+| D-5 | 2026-10-15 | Modelo de render | ViewModel declarativo + diff propio: la app expone propiedades, listas con clave estable y comandos; nunca ve un builder ni un selector. Un solo motor de diff en ui-kit alimenta a todos los backends | user | R-API, R-KIT, R-LEG, R-NOE |
+| D-6 | 2026-10-15 | Línea 2.x | Rama release/2.x congelada en alpha.13, solo fixes. Etiqueta v2.0.0-alpha.13 y release/2.x empujadas a origin (fix posterior: 331939f, assert-release-jar) | user (push aprobado 2026-10-15) | consumidores no portados |
+| D-7 | 2026-10-15 | Método desde F2 | Spec-driven: ninguna fase posterior escribe código que no cubra un R-xx; tests de contrato en rojo con tag JUnit `contract`, perfil `-Pcontract` | user | F2–F9 |
+| D-8 | 2026-10-15 | Rango de versiones de consumidores | 2.x: `>=2.0.0-alpha.1 <3.0.0`; alphas 3.0: `>=3.0.0-alpha.1` (regla estricta npm de pre-releases, SemverRange.java:49-71) | verificado en F0 | R-APP, consumidores |
+| D-9 | 2026-10-15 | ¿Dust design system en 3.0? | Se abandona Dust: no hay design system en 3.0 ni en 3.1. Interpretación anotada (ver Q-8): los .ui actuales (Dust*.ui, DustLib) se quedan como maqueta legacy y la paleta de temas existente (Default/Dark/Compact) se conserva por paridad (R-PAR-SHELL-26/27) | user | R-KIT, R-LEG |
+| D-10 | 2026-10-15 | ¿Se retira Phonemod-Assets? | No: se mantiene el pack separado. F9 ya no unifica el arte en el jar; sigue la regla de subir Version del pack en cada cambio de arte | user | F9 |
+| D-11 | 2026-10-15 | Fidelidad de paridad | Funcional, no píxel a píxel: mismo comportamiento observable; la maqueta .ui puede cambiar donde los bindings lo simplifiquen. Verificación: tests headless + exit pass in-game | user | R-PAR |
+| D-12 | 2026-10-15 | Bugs de 2.x encontrados en el inventario (research/R-PAR-DRAFT.md §Divergencias 1-8) | Se corrigen en 3.0: R-PAR describe el comportamiento correcto y cada bug es un R-PAR-FIX-n con test. release/2.x no se toca | user | R-PAR |
+| D-13 | 2026-10-15 | IN_GAME_EXIT_PASS.md desalineado con el código | Se escribe docs/v3/IN_GAME_EXIT_PASS_V3.md generado desde los R-PAR marcados G, con los comandos reales. El de 2.x queda en su rama | user | R-PAR, gates F5–F7 |
+| D-14 | 2026-10-15 | Devices compartidos (PC) | Ciudadanos de primera en el core 3.0: sesión identificada por DeviceSessionId (no por número), registro online también para compartidos, refresh/sync/pushes iguales en phone y PC | user | R-CORE, R-API, R-SYNC |
+| D-15 | 2026-10-15 | Tests existentes en la extracción F3 | Se permiten renombres mecánicos (paquete, imports, FQN) para un core limpio. Salvaguarda propuesta (Q-9): ningún cambio en cuerpos de test ni en aserciones; lo comprueba un diff que solo admite líneas package/import | user | F3 gate |
+| D-16 | 2026-10-15 | Forma del ViewModel | Campos tipados `Prop<T>` y `ListProp<K,Item>` (clave estable) declarados en la clase del modelo; sin reflexión; dirty-tracking en el set; mapeo 1:1 a Noesis setProperty/insertItem | user | R-API, R-KIT |
+| D-17 | 2026-10-15 | Manifiesto de bindings legacy | En Java, en `LegacyView` del descriptor (módulo ui-legacy), tipado contra los Prop; validado al arrancar; selectores cubiertos por check-ui-docs.sh | user | R-LEG |
+| D-18 | 2026-10-15 | Validación de DeviceAction | La app valida libremente (recibe el mapa de primitivos). Contradicción con R-PAR-SHELL-14 y el riesgo Noesis abierta como Q-10 | user | R-API, R-KIT, R-NOE |
+| D-19 | 2026-10-15 | Hilos del contexto | `refresh()` invocable desde cualquier hilo (salta al hilo del mundo); acceso a modelo/estado solo en el hilo del mundo, con excepción clara fuera de él; `ctx.onWorld(m -> …)` para mutar desde async | user | R-API, R-CORE |
+| D-20 | 2026-10-15 | Q-10: qué se queda en el backend | "Respetar el backend existente al máximo": las guardas actuales (UiEventDecoder/UiEventValidator, TokenBucket, AppOpenAuthorizer, sesión/página stale, tamaño) se reutilizan sin cambios en el backend; la app solo valida semántica (D-18). PRINCIPIO GENERAL: 3.0 es una capa de abstracción sobre las clases que usan la UI (DevicePage, routing, apps, ThemeService, OpenPhone, platform) para que se implementen como apps de dispositivo; el dominio y el backend no se reescriben | user | todo; R-KIT, R-NOE, R-CORE |
+| D-21 | 2026-10-15 | Q-9: salvaguarda de renombres de tests | Sí: `bin/check-test-renames.sh` compara `git diff -M` contra v2.0.0-alpha.13 y falla si cambia algo distinto de líneas package/import/FQN | user | F3 gate |
+| D-22 | 2026-10-15 | Q-8: Dust y temas | Dust queda aparcado: los Dust*.ui y DustLib no se tocan. El sistema de temas no se rediseña en 3.0; se reorientará al explorar Noesis (R-NOE / posterior). 3.0 conserva el comportamiento actual de temas por paridad (R-PAR-SHELL-26/27). Sustituye la interpretación de D-9 | user | R-KIT, R-LEG, R-NOE |
+| D-23 | 2026-10-15 | Origen de R-SYNC | Se promueve el `phone.sync` actual (SyncChannelType+BuilderCodec, PERSISTENT/EPHEMERAL, ChannelStore con .bak, tope de mensajes) a API tipada `ctx.sync(type)`; publicar dispara refresh() de los suscriptores, incluidos devices compartidos (D-14). Sustituye a LegacyRooms y al stub v2 | user | R-SYNC, R-API |
