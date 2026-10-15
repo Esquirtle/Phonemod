@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-jar_path="${1:-phonemod-runtime/target/Phonemod-2.0.0-alpha.1.jar}"
+if [[ $# -ge 1 ]]; then
+    jar_path="$1"
+else
+    # The shaded release jar; original-*.jar is the pre-shade input and is excluded.
+    shopt -s nullglob
+    candidates=(phonemod-runtime/target/Phonemod-*.jar)
+    shopt -u nullglob
+    if [[ ${#candidates[@]} -ne 1 ]]; then
+        echo "Expected exactly one phonemod-runtime/target/Phonemod-*.jar, found ${#candidates[@]}; pass the path explicitly" >&2
+        exit 1
+    fi
+    jar_path="${candidates[0]}"
+fi
 
 if [[ ! -f "$jar_path" ]]; then
     echo "Release JAR not found: $jar_path" >&2
