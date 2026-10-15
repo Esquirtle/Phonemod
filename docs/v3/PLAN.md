@@ -1,5 +1,5 @@
 # Phonemod 3.0 — Plan de construcción
-Aprobado: SPEC v0 sí (D-24, 2026-10-15) · PLAN: **pendiente de aprobación**
+Aprobado: SPEC v0 (D-24) · PLAN (D-29, 2026-10-15)
 
 Todo el trabajo de 3.0 va en la rama `feature/v3`, que sale de `feature/v2-refactor`.
 `release/2.x` solo recibe fixes (D-6).
