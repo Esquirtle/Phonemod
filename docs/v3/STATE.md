@@ -1,4 +1,6 @@
 # Phonemod 3.0 — Estado
+
+> **Movido:** desde 2026-10-15 la fuente de verdad de docs/v3 es la rama `feature/v3` (worktree `../Phonemod-v3`).
 Stage: 1-interview (F2 · spec + tests de contrato)
 Phase: F2
 Interview position: SPEC v0 escrito y empujado; esperando gate del usuario (aprobar SPEC + 5 propuestas mías)
