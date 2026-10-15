@@ -1,9 +1,15 @@
 # Phonemod 3.0 — Estado
-Stage: 1-interview (F2 · spec + tests de contrato)
-Phase: F2
-Interview position: SPEC v0 escrito y empujado; esperando gate del usuario (aprobar SPEC + 5 propuestas mías)
+Fuente de verdad: rama `feature/v3` (worktree `~/workspace/plugins-srcs/Phonemod-v3`). Las docs de `feature/v2-refactor` quedan congeladas en c661929.
+Stage: 3-build
+Phase: F2 (spec + tests de contrato) — construida y verificada; pendiente de aprobación del gate F2
 Running: —
-Last completed: ronda 1 + research/R-PAR-DRAFT.md + research/SPLIT-AUDIT.md; F0 verde (96 tests, ENABLED con TuiterApp, alpha.13 etiquetada y empujada); spike F1 construido y commiteado (hytale-plugins 326dba5)
-Next: tras aprobar → PLAN.md con cards por fase citando R-xx; tests de contrato en rojo (ApiContractTest 3.0, diff/validación sobre FakeBackend, check-api-no-ui-imports.sh, check-test-renames.sh) en perfil -Pcontract
-Waiting on user: prueba con cliente del spike F1 (13 escenarios, `./noesis-spike/run-spike-server.sh`, UDP 5530)
+Last completed (2026-10-15):
+- SPEC v0 aprobada (D-24) + D-25..D-28 (respuestas del Architect), R-API-9 añadido
+- F2-1 plan del esqueleto (phases/F2/plan-skeleton.md)
+- F2-2/3/4 en b3b12e5: api/v3 (18 tipos), módulo phonemod-ui-kit, 62 tests de contrato, bin/check-api-no-ui-imports.sh, bin/check-test-renames.sh
+- F2-5 IN_GAME_EXIT_PASS_V3.md
+- Verificación (re-ejecutada por el orquestador, mvn clean): default 96/96 verdes; -Pcontract 62 tests = 5 verdes (4 pins de firma + invalidIdRejected) y 57 rojos, todos con marcador F4 (54 UnsupportedOperationException, 3 fail explícitos), 0 por otra causa; scripts 0 + self-tests 0; jar con 20 clases api/v3 y 0 ui/kit; assert-release-jar 0; boot desechable → `Enabled plugin esq.phonemod:Phonemod`, `Hytale Server Booted!`
+Desviaciones aceptadas del implementer: DeviceType y GuardVerdict tienen constructor real (constantes estáticas propias; un F4 rompería <clinit>); ActionGuards.authorizeOpen devuelve GuardVerdict (ui-kit no ve security).
+Next: aprobación del gate F2 → F3 (extracción del core): F3-1 architect
+Waiting on user: aprobar gate F2; Q-11 (R-PAR-ADM); prueba con cliente del spike F1 (Q-1..Q-4)
 Updated: 2026-10-15
