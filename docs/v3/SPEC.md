@@ -1,5 +1,5 @@
 # Phonemod 3.0 — Especificación
-Estado: **v0, para revisión** (entrevista rondas 1–4 cerradas) · Actualizado: 2026-10-15 ·
+Estado: **v0 aprobada 2026-10-15 (D-24)** · Actualizado: 2026-10-15 ·
 Engine: hytale-shared-source `release` 0033ae473 · Base: Phonemod 2.0.0-alpha.13 (`331939f`)
 
 Cada requisito lleva un id, un criterio de aceptación verificable y una verificación asignada:
