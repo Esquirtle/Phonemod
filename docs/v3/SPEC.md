@@ -42,6 +42,7 @@ respecto al backend (D-20).
 | R-API-5 | `DeviceAction` = id de comando + mapa de parámetros primitivos. La app valida la semántica (D-18) | `ApiContractTest`: DeviceAction solo admite String, Integer, Long, Double y Boolean | C |
 | R-API-6 | `DeviceAppContext`: `player()`, `identity()`, `sessionId()`, `deviceType()`, `address()` no Optional (las sesiones compartidas tienen address sintética estable, D-14), `refresh()`, `onWorld(Consumer<M>)`, `sync(SyncChannelType<S>)`, `notify()` y `state()` | `ApiContractTest` fija las firmas | C |
 | R-API-7 | `AppDescriptor` lleva id, nombre, permisos (todos), visibility, deviceTypes, isSystem, sortOrder y `views`, un mapa Backend → ViewRef. Una app que solo declara legacy funciona en cualquier backend gracias al fallback | Tests de contrato sobre el builder del descriptor y la resolución del fallback | C |
+| R-API-9 | `AppService.registerApp(DeviceApp<?>)` registra una app atada al plugin (se desregistra al deshabilitarlo) y `refreshApp(DeviceSessionId)` pide un repintado desde fuera de la app (D-28) | `ApiContractTest` fija las firmas; un test headless comprueba que refreshApp de una sesión abierta produce un diff | C+H |
 | R-API-8 | El DeviceType es un tipo de primera clase (`phone`, `pc` o extensible desde el asset). Se elimina la clave de estado `__deviceType__` | grep-gate: `__deviceType__` no aparece en el código 3.0 | S |
 
 ### R-CORE — dominio neutral (`phonemod-core`)
@@ -128,7 +129,7 @@ comandos reales `/deviceframework migration …` (D-13).
 ## 4. Matriz de trazabilidad (resumen; se completa en PLAN.md)
 | grupo | verificación dominante | fase |
 |---|---|---|
-| R-API-1..8 | C / S | F2 (rojo) → F4 (verde) |
+| R-API-1..9 | C / S | F2 (rojo) → F4 (verde) |
 | R-CORE-1..8 | S / H | F3 |
 | R-KIT-1..5 | C / H | F2 (rojo) → F4 |
 | R-LEG-1..6 | H / S / G | F5 |
